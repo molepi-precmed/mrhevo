@@ -14,8 +14,7 @@ This method extends the likelihood-based approach
 3. to generate classical maximum likelihood estimates and _p_-values for the causal effect. 
 
 
-The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are clumps of SNPs with trans- effects on the expression of a gene as transcript or circulating protein.  
+The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003) (also see [GitHub repository for GATE](https://github.com/molepi-precmed/trans-qtls)), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are clumps of SNPs with trans- effects on the expression of a gene as transcript or circulating protein.
 
 
 This is work in progress.  We shall upload example datasets, vignettes and eventually an R package. 
-
