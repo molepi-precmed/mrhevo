@@ -16,7 +16,7 @@ This method extends the likelihood-based approach
 
 The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are clumps of SNPs with trans- effects on the expression of a gene as transcript or circulating protein.  
 
-A description of the statistical model is [here](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf)
+A description of the statistical model is [here](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf) and a vignette is [here](https://htmlpreview.github.io/?https://github.com/molepi-precmed/mrhevo/blob/main/vignette.html)
 
-This is work in progress.  We shall upload example datasets, vignettes and eventually an R package. 
+This is work in progress.  We shall upload further examples and eventually an R package. 
 
