@@ -68,11 +68,11 @@ model {
   alpha ~ normal(alpha_hat, sd_alpha_hat);
   intercept_y ~ normal(0, scale_intercept_y);
   // half Student-t priors for local and global scale parameters (nu = 1 corresponds to horseshoe)
-  beta_u ~ normal(0, 1);
+  beta_u ~ std_normal(); 
   theta ~ normal(0, priorsd_theta);
-  z ~ normal(0, 1);
+  z ~ std_normal();
 
-  aux1_local ~ normal(0, 1); // aux1_local
+  aux1_local ~ std_normal(); // aux1_local
   aux2_local ~ inv_gamma(0.5 * nu_local, 0.5 * nu_local); 
   aux1_global ~ normal(0, 1);  // aux1_global
   aux2_global ~ inv_gamma(0.5 * nu_global, 0.5 * nu_global); 
