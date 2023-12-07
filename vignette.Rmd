@@ -30,8 +30,7 @@ This vignette demonstrates an analysis using `MRHevo` to overcome some of the li
 
 * Inference of causality in the presence of pleiotropic effects is based on marginalizing over the distribution of pleiotropic effects to compute the likelihood as a function of the causal effect parameter, rather than on constructing "estimators" that downweight or exclude those instruments that appear to be outliers.  The statistical model is described on [this page](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf. 
 
-For now the method requires an individual-level dataset with genotypes and outcome, though it uses summary statistics for the genotype-exposure associations.  
-
+Where multiple SNPs are used to calculate each scalar instrument from summary statistics for the genotype-exposure association, an individual-level dataset with genotypes and outcome is required in step 2 to calculate summary statistics for the effects of these instrument on the outcome.  The model-fitting can use either summary statistics (fast) or individual-level data (slow if the dataset is large).  
 
 ## Input dataset
 
@@ -39,7 +38,7 @@ The input dataset should comprise:
 
 * `Y` a vector of length `N` containing outcomes (in this example type 2 diabetes as a binary outcome
 
-* `Z` an `N x J` data.table of unlinked genetic instruments
+* `Z` an `N x J` data.table of unlinked genetic instruments.  
 
 * `X_u` an `N x U` data.table of unpenalized covariates (this will usually include scores on the first few principal components of the genotype matrix
 
@@ -112,7 +111,7 @@ p.coeffs <- ggplot(coeffs.scores,
                                     aes(x=alpha_hat, y=beta_YZ, color=qtl_type)) + 
       geom_point(aes(size=size.thetaIV), alpha=0.8) +
       scale_size(guide="none") + 
-    ggrepel::geom_text_repel(aes(label=qtlname), force=2, size=2.5, fontface="italic", color="blue") + 
+    ggrepel::geom_text_repel(aes(label=qtlname), force=2, size=4, fontface="italic", color="blue") + 
     scale_x_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) + 
     scale_y_continuous(expand =  expansion(mult = c(0.1, 0.1))) + 
     geom_abline(data=estimators.dt,
@@ -124,7 +123,8 @@ p.coeffs <- ggplot(coeffs.scores,
     guides(color=guide_legend(title="QTL type")) +
     xlab(paste("Effect of genetic instrument on ", gene.query)) +
     ylab(paste("Effect on", long.phenoname)) +
-    coord_fixed(ratio=2)
+  coord_fixed(ratio=2)
+save(p.coeffs, file="p.coeffs.ADIPOQ.RData")
 p.coeffs
 
 ```
@@ -159,7 +159,7 @@ se.gamma_hat <- coeffs.scores[qtl_type=="trans", SE_YZ]
 alpha_hat <- coeffs.scores[qtl_type=="trans", alpha_hat]
 se.alpha_hat <- coeffs.scores[qtl_type=="trans", se.alpha_hat]
 
-hevo.stanfit <- run_mrhevo.sstats(N, alpha_hat, se.alpha_hat,
+hevo.stanfit <- run_mrhevo.sstats(alpha_hat, se.alpha_hat,
                                   gamma_hat, se.gamma_hat,
                                   fraction_pleio=0.2,
                                   priorsd_theta=priorsd_theta)
