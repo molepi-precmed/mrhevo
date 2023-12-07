@@ -16,6 +16,7 @@ data {
   int <lower=0> U; // number of unpenalized covariates
   int <lower=0> J; // number of instruments
   real < lower=0 > scale_intercept_y; // prior sd for Y intercept
+  real < lower=0 > scale_beta_u; // prior sd for effects of unpenalized covariates
   real < lower=0 > scale_global; // scale for the half-t prior on tau
   real < lower =1 > nu_global ; // degrees of freedom for the half-t prior on global scale param tau
   real < lower =1 > nu_local ; // degrees of freedom for the half-t priors on local scale parameters
@@ -30,13 +31,19 @@ data {
   vector <lower=0> [J] sd_alpha_hat; // standard error of estimated coeffs alpha_hat
 }
 
+transformed data {
+  matrix[N, U] Q_ast;
+   // thin and scale the QR decomposition
+  Q_ast = qr_thin_Q(X_u) * sqrt(N - 1);
+ }
+
 parameters {
   //  real <lower=0> sigma_y;
   real < lower=0 > aux1_global;
   real < lower=0 > aux2_global;
   real < lower=0 > caux ;
   real intercept_y; // intercept for Y
-  vector[U] beta_u; // coefficients for unpenalized covariates
+  vector[U] beta_u; // coefficients for QR-transformed unpenalized covariates
   vector[J] alpha; // effect of each instrument Z on X, distributed as N(alpha_hat, sd.alpha_hat)
   vector[J] z; // pleiotropic effects, before global and local scaling
   real theta; // causal effect of X on Y
@@ -64,11 +71,11 @@ transformed parameters {
 model {
   // theta should be a column vector of length 1
   // Y ~ normal(intercept_y + Z * beta + Xpred * theta, sigma_y); 
-  Y ~ bernoulli_logit(intercept_y + X_u * beta_u + Z * beta + Xpred * theta);
+  Y ~ bernoulli_logit(intercept_y + Q_ast * beta_u + Z * beta + Xpred * theta);
   alpha ~ normal(alpha_hat, sd_alpha_hat);
   intercept_y ~ normal(0, scale_intercept_y);
   // half Student-t priors for local and global scale parameters (nu = 1 corresponds to horseshoe)
-  beta_u ~ std_normal(); 
+  beta_u ~ normal(0, scale_beta_u); 
   theta ~ normal(0, priorsd_theta);
   z ~ std_normal();
 
