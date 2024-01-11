@@ -10,7 +10,7 @@ author:
    affiliation: IGC
  - name: Athina Spiliopoulou
    affiliation: Usher
- - name: Helen Colhoun
+ - name: Helen M Colhoun
    affiliation: IGC
 address:
  - code: Usher
@@ -63,40 +63,42 @@ options(knitr.kable.NA = '.')
 options(knitr.table.format = "latex") # adds tab: prefix to labels
 knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE, fig.pos='H')
 
-load("mrhevopaper.RData")
+load("mrhevopaper_f0.8_slabscale0.025.RData")
+
+alt.result.DeC <- methods.dt[grepl("Marginaliz", Estimator) & study=="DeC", ]
+alt.result.UKB <- methods.dt[grepl("Marginaliz", Estimator) & study=="UKB", ]
+
+load("mrhevopaper_f0.2_slabscale0.25.RData")
 load(file.path(save.dir, "somalogic.gwasids.excluded.RData"))
 
 result.DeC <- methods.dt[grepl("Marginaliz", Estimator) & study=="DeC", ]
 result.UKB <- methods.dt[grepl("Marginaliz", Estimator) & study=="UKB", ]
+
 ```
 # Abstract
-Current methods for Mendelian randomization have several limitations: to construct unlinked genetic instruments they use only one SNP for each clump of exposure-associated SNPs, they require that weak instruments are excluded, and inference of causality in the presence of pleiotropic effects relies on makeshift procedures for downweighting outliers.  This paper describes methods that overcome these limitations.  A scalar instrument is constructed from all exposure-associated SNPs in each clump of SNPs. Inference of causality is based on marginalizing over the distribution of pleiotropic effects to compute the likelihood as a function of the causal effect parameter; this does not require weak instruments to be excluded.  
+Current methods for Mendelian randomization studies have several limitations: to construct unlinked genetic instruments they can use only one SNP from each clump of exposure-associated SNPs, they require that weak instruments are excluded, and they rely on makeshift procedures for downweighting outliers to allow inference of causality in the presence of pleiotropic effects.  This paper describes methods that overcome these limitations.  A scalar instrument is constructed from all exposure-associated SNPs in each clump, and inference of causality is based on marginalizing over the distribution of pleiotropic effects. 
 
-To demonstrate the approach, we tested the effect of circulating levels of adiponectin, encoded by the _ADIPOQ_ gene, on the risk of type 2 diabetes.  Scalar genotypic instruments were constructed from 12 unlinked _trans_-pQTLs detected in Icelanders using the Somalogic platform and 15 detected in the UK Biobank study using the Olink platform.  The instruments were tested for assocation with type 2 diabetes in a non-overlapping subset of the UK Biobank cohort.  In contrast to the results of two earlier Mendelian randomization studies of adiponectin that used only a _cis_-pQTL, with multiple _trans_-pQTLs there was clear evidence for a causal effect: standardized log odds ratio `r round(result.DeC$Estimate, 2)` (95% CI `r round(result.DeC$cl.lower, 2)` to `r round(result.DeC$cl.upper, 2)`) using DeCode instruments and `r round(result.UKB$Estimate, 2)` (95% CI  `r round(result.UKB$cl.lower, 2)` to `r round(result.UKB$cl.upper, 2)`) using UK Biobank instruments.  
+To demonstrate the approach, we tested the effect of circulating levels of adiponectin, encoded by _ADIPOQ_, on the risk of type 2 diabetes.  Genotypic instruments were constructed from  `r scoresinfo.gene[qtl_type=="trans" & study=="DeC", .N]` unlinked _trans_-pQTLs detected in Icelanders using the Somalogic platform and  `r scoresinfo.gene[qtl_type=="trans" & study=="UKB", .N]` detected in the UK Biobank study using the Olink platform.  These instruments were tested for association with type 2 diabetes in a non-overlapping subset of the UK Biobank cohort.  In contrast to the results of earlier Mendelian randomization studies of adiponectin that used only a _cis_-pQTL, with multiple _trans_-pQTLs there was clear evidence for a causal effect: standardized log odds ratio `r round(result.DeC$Estimate, 2)` (95% CI `r round(result.DeC$cl.lower, 2)` to `r round(result.DeC$cl.upper, 2)`) using DeCODE instruments and `r round(result.UKB$Estimate, 2)` (95% CI  `r round(result.UKB$cl.lower, 2)` to `r round(result.UKB$cl.upper, 2)`) using UK Biobank instruments.  
 
 Guidelines for the design of Mendelian randomization studies that recommend exclusion of weak instruments, or restricting the instruments to _cis_-acting variants where the exposure under study is a gene transcript or gene product, should be reassessed. 
 
 \newpage
+<!--\linenumbers-->
 
 # Introduction
-Instrumental variable analysis with genetic instruments ("Mendelian randomization") has been widely used to study causal effects of exposures (broadly defined to include behavioural traits, biomarkers and gene expression levels) on diseases.  The biggest methodological challenge is how to infer causality when some of the genetic instruments have direct (pleiotropic) effects on the outcome that are not mediated through the exposure under study.  These pleiotropic effects are usually not directly observed, and their distribution over the instruments is unknown. 
+Instrumental variable analysis with genetic instruments ("Mendelian randomization") has been widely used to infer causal effects of exposures (broadly defined to include behavioural traits, biomarkers and gene expression levels) on diseases.  The biggest methodological challenge is how to infer causality when some of the genetic instruments have direct (pleiotropic) effects on the outcome that are not mediated through the exposure under study.  These pleiotropic effects are usually not directly observed, and their distribution over the instruments is unknown.  The most widely-used methods use summary statistics for the coefficients for the effect of each SNP on the outcome and on the exposure from non-overlapping samples [@hemani_mrbase_2018].  A typical workflow is to select, from each genomic region in which genetic associations with the exposure have beeen detected, a single SNP that is reliably associated with the exposure.  "Estimators" for the causal effect are constructed from the ratios of SNP-outcome to SNP-exposure coefficients.  These methods have several limitations: 
 
-The most widely-used methods use summary statistics for the coefficients for the effect of each SNP on the outcome and on the exposure from non-overlapping samples [@hemani_mrbase_2018].  A typical workflow is to select, from each genomic region in which genetic associations with the exposure have beeen detected, a single SNP that is reliably associated with the exposure.  From the ratios of SNP-outcome to SNP-exposure coefficients an "estimator" for the causal effect is constructed. Outliers that are likely to be "invalid instruments" are downweighted or excluded.  
+* To ensure that the instruments are unlinked and their effects can be modelled as independent, only one variant in each genomic region is used to construct each instrument.  This does not use all the available information about the effects of variants in the region on the exposure, and the results may depend upon which variants are selected. 
 
-These methods have several limitations: 
+* Because the estimators are based on the sampling distribution of ratios of coefficient estimates, "weak instruments" with small or uncertain effects on the exposure have to be excluded because the sampling distribution of a ratio is badly-behaved when the denominator (in this case the SNP-exposure coefficient) is small and is estimated with uncertainty. This exclusion of "weak instruments" limits the number of unlinked instruments that can be included in the analysis. Where the exposure under study is the expression of a gene or the level of a circulating protein, this is likely to exclude many _trans_-eQTLs and _trans_-pQTLs which typically have weak effects [@burgess_guidelines_2023]. 
 
-* To ensure that the instruments are unlinked and that their effects can be modelled as independent, only one variant in each genomic region is used to construct each instrument.  This does not use all the available information about the effects of variants in the region on the exposure, and the results may depend upon which variants are selected. 
+* Inference of causality in the presence of pleiotropic effects relies on makeshift procedures for the construction of estimators that downweight or exclude instruments that are outliers, for instance by calculating a weighted median.  The results depend on which estimator is used: guidelines suggest that "investigators should pick a sensible range of methods to assess the sensitivity of their findings" [@burgess_guidelines_2023]. 
 
-* Because the estimators are based on the sampling distribution of ratios of coefficient estimates, "weak instruments" with small or uncertain effects on the exposure have to be excluded because the sampling distribution of a ratio is badly-behaved when the denominator (in this case the SNP-exposure coefficient) is small and is estimated with uncertainty. This exclusion of "weak instruments" limits the number of unlinked instruments that can be included in the analysis. Where the exposure under study is the expression of a gene or the level of a circulating protein, the analysis is often restricted to _cis_-eQTLs or _cis_-pQTLs [@burgess_guidelines_2023], so that there is only a single unlinked instrument. 
-
-* Inference of causality in the presence of pleiotropic effects relies on makeshift procedures for the construction of estimators that downweight or exclude instruments that are outliers, for instance by calculating a weighted median.  The results may depend on which estimator is used. 
-
-This paper describes methods to overcome these limitations, and demonstrates an application to the inference of causal effects of the protein adiponectin, encoded by _ADIPOQ_, on type 2 diabetes.  
+This paper describes methods to overcome these limitations, and demonstrates their application to infer a causal effect of the protein adiponectin, encoded by _ADIPOQ_, on type 2 diabetes. 
 
 ## Methods
 ## Statistical model
-
-For Mendelian randomization with $J$ unlinked genetic instruments, we have three parameters:
+For a Mendelian randomization study with $J$ unlinked genetic instruments, we specify a model with three parameters:
 
 \begin{itemize}
 
@@ -104,29 +106,27 @@ For Mendelian randomization with $J$ unlinked genetic instruments, we have three
 
 \item $\boldsymbol{\beta}$ vector of coefficients of direct (pleiotropic) effects of the instruments on outcome $Y$
 
-\item $\theta$ parameter for causal effect of $X$ on $Y$
+\item $\theta$ causal effect of $X$ on $Y$
 
 \end{itemize}
 
-From summary statistics we have estimates $\boldsymbol{\hat{\alpha}}$ of the effects $\boldsymbol{\alpha}$ of the instruments on the exposure, with corresponding standard errors $\boldsymbol{s_{XZ}}$. As the instruments are unlinked, we can model the estimates $\boldsymbol{\hat{\alpha}}$ as independent Gaussian variables conditional on the true values $\boldsymbol{\alpha}$:
+From summary statistics we have estimates $\boldsymbol{\hat{\alpha}}$ of the effects $\boldsymbol{\alpha}$ of the instruments on the exposure, with corresponding standard errors $\boldsymbol{s_{\alpha}}$. As the instruments are unlinked, we can model the estimates $\boldsymbol{\hat{\alpha}}$ as independent Gaussian variables conditional on the true values $\boldsymbol{\alpha}$:
 
 \[
- \hat{\alpha}_j \sim \mathcal{N} \left( \alpha_j, s_{XZ \left( j \right) }^2 \right)
+ \hat{\alpha}_j \sim \mathcal{N} \left( \alpha_j, s_{\alpha \left( j \right) }^2 \right)
 \]
 
-With individual-level data on genotypic instruments $Z$, covariates $\boldsymbol{X_u}$ and outcome $Y$ in $N$ individuals, we can model the dependence of $Y$ on $Z$ and $\boldsymbol{X_u}$ with a generalized linear model: 
+With individual-level data on genotypic instruments $\boldsymbol{Z}$, covariates $\boldsymbol{X_u}$ and outcome $Y$ in $N$ individuals, we can model the dependence of $Y$ on $Z$ and $\boldsymbol{X_u}$ with a generalized linear model: 
 
 \[
 g \left( \mathbb{E} \langle Y \rangle \right) = \beta_0 + \boldsymbol{X_u} \cdot \boldsymbol{\beta_u} + \boldsymbol{Z} \cdot \boldsymbol{\beta} + \theta \boldsymbol{Z} \cdot \boldsymbol{\alpha} 
 \]
-where $g \left( \right)$ is the logit link function for a logistic regression.  
+where $g \left( \right)$ is a link function (logit for a logistic regression).  With priors on $\beta_0, \boldsymbol{\beta_u}, \boldsymbol{\beta}, \theta$ we can compute the joint posterior distribution of these parameters given $\boldsymbol{\hat{\alpha}}, \boldsymbol{s_{\alpha}}, \boldsymbol{Z}, \boldsymbol{X_u}, Y$.  
 
-With priors on $\beta_0, \boldsymbol{\beta_u}, \boldsymbol{\beta}, \theta$ we can compute the joint posterior distribution of these parameters given $\boldsymbol{\hat{\alpha}}, \boldsymbol{s_{XZ}}, \boldsymbol{Z}, Y$.  
-
-Where we have only summary-level data on the dependence of outcome $Y$ on genotypic instruments $Z$ (or to reduce the computational burden of an individual-level analysis), we can model the estimated coefficients $\boldsymbol{\hat{\gamma}}$ of the regression of $Y$ on $Z$ as independent Gaussian variables conditional on the true values $\boldsymbol{\gamma}$, using the standard errors $\boldsymbol{s_{YZ}}$ of the estimates to set the prior standard deviations. 
+Where we have only summary-level data on the dependence of outcome $Y$ on genotypic instruments $Z$ (or to reduce the computational burden of an individual-level analysis), we can model the observed coefficient estimates $\boldsymbol{\hat{\gamma}}$ of the regression of $Y$ on $Z$ as independent Gaussian variables conditional on the true values $\boldsymbol{\gamma}$, using the standard errors $\boldsymbol{s_{\gamma}}$ of the estimates to set the prior standard deviations. 
 
 \[
- \hat{\gamma}_j \sim \mathcal{N} \left( \gamma_j, s_{YZ\left( j \right) }^2 \right)
+ \hat{\gamma}_j \sim \mathcal{N} \left( \gamma_j, s_{\gamma\left( j \right) }^2 \right)
 \]
 
 The crude effect of each instrument on the outcome is the sum of the direct effect and the causal effect. 
@@ -135,124 +135,106 @@ The crude effect of each instrument on the outcome is the sum of the direct effe
  \gamma_j = \beta_j + \theta \alpha_j
 \]
 
-With priors on $\boldsymbol{\beta}, \theta$ we can compute the joint posterior distribution of these parameters given $\boldsymbol{\hat{\gamma}}, \boldsymbol{s_{YZ}}, \boldsymbol{\hat{\alpha}}, \boldsymbol{s_{XZ}}$. 
+With priors on $\boldsymbol{\beta}, \theta$ we can compute the joint posterior distribution of these parameters given $\boldsymbol{\hat{\gamma}}, \boldsymbol{s_{\gamma}}, \boldsymbol{\hat{\alpha}}, \boldsymbol{s_{\alpha}}$. 
 
-Dividing the posterior distribution of the causal effect parameter $\theta$ by the prior on this parameter gives the likelihood as a function of $\theta$, from which we can obtain classical maximum likelihood estimates and _p_-values.  In the Bayesian framework unobserved pleiotropic effects are handled like all other unobserved variables, by marginalizing over their posterior distribution.  As the form of the distribution of pleiotropic effects over loci is unknown, any realistic statistical model has to specify a prior that encompassses a broad family of symmetric distributions ranging from a spike-and-slab to a Gaussian.  One such prior is the horseshoe prior [@carvalho_handling_2009], which has been applied to inference of causal effects from Mendelian randomization using individual-level data [@berzuini_bayesian_2020] or summary-level data [@grant_bayesian_2023a].  A limitation of the original horseshoe prior is that there is no way of specifying a realistic prior on the size of the nonzero effects in the "slab" component.  The effects of common variants on a complex trait are usually small.  The regularized horseshoe prior, known as the "Finnish horseshoe", overcomes this limitation [@piironen_sparsity_2017-1]. On this basis, the statistical method described in this paper is named `MR-Hevo` ("hevo" is Finnish for a horse).  The statistical model is described in Supplementary Information.  
+As the form of the distribution of pleiotropic effects over loci is unknown, any realistic statistical model has to specify a prior on these effects that encompassses a broad family of symmetric distributions ranging from a spike-and-slab to a Gaussian.  One such prior is the horseshoe prior [@carvalho_handling_2009], which has been applied to inference of causal effects from Mendelian randomization using individual-level data [@berzuini_bayesian_2020] or summary-level data [@grant_bayesian_2023a].  A limitation of the original horseshoe prior is that there is no way of specifying a realistic prior on the size of the nonzero effects in the "slab" component.  This is especially relevant to genetics, as effects of common genetic variants on a complex trait are usually small.  The regularized horseshoe prior, known as the "Finnish horseshoe", overcomes this problem [@piironen_sparsity_2017-1]. We name our method "MR-Hevo", using the Finnish word for a horse to distinguish it from the recently-described "MR-Horse" method which uses an unregularized horseshoe prior [@grant_bayesian_2023a].  The statistical model is described in Supplementary Information.  
 
-To generate the posterior distribution given the model and the data, we use the program `Stan` to sample the posterior distribution.  For the large datasets in this example, we have used summary-level data to keep the computation time short.  The likelihood of the causal effect parameter $\theta$ was obtained by fitting a kernel density to the posterior samples of $\theta$, weighting each observation by the inverse of the prior.  A quadratic function was fitted to the logarithm of this likelihood function. The maximum likelihood estimate, confidence interval and test of the null hypothesis $\theta=0$ were obtained from this quadratic approximation to the log-likelihoood. 
+To generate the posterior distribution given the model and the data, we use the program `Stan` to sample the posterior distribution.  For the large datasets in this example, we have used summary-level data to keep the computation time short.  To obtain the likelihood as a function of the parameter of interest, we divide the posterior by the prior on that parameter. In large samples, the log-likelihood is asymptotically quadratic and the maximum likelihood estimate of $\theta$, its confidence interval and a test of the null hypothesis $\theta=0$ can be obtained from this quadratic approximation.  We estimated the likelihood as a function of the causal effect parameter $\theta$ by fitting a kernel density to the posterior samples of $\theta$, weighting each observation by the inverse of the prior.  A quadratic function was fitted by least-squares to the logarithm of this likelihood function. 
 
 ## Constructing scalar instruments from multiple SNPs
-From summary statistics we have for each clump of exposure-associated SNPs a vector $\boldsymbol{\hat{\alpha_u}}$ of estimated univariate coefficients for the effect of the SNPs on the exposure.  Estimates of the multivariable coefficients $\hat{\boldsymbol{\alpha}_m}$ are calculated by premultiplying the univariate coefficients by the inverse of the correlation matrix $\boldsymbol{\Sigma_G}$ between the SNP genotypes.  
+From summary statistics we have for each clump of exposure-associated SNPs a vector $\boldsymbol{\hat{\alpha}_u}$ of univariate coefficient estimates for the effect of the SNPs on the exposure.  Multivariable coefficient estimates $\boldsymbol{\hat{\alpha}_m}$ are calculated by premultiplying the univariate coefficients by the inverse of the correlation matrix $\boldsymbol{\Sigma_G}$ between the SNP genotypes.  
 
 \[
-\hat{\boldsymbol{\alpha}_m} = \boldsymbol{\Sigma_G^{-1}} \boldsymbol{\hat{\alpha_u}}
+\boldsymbol{\hat{\alpha}_m} = \boldsymbol{\Sigma_G^{-1}} \boldsymbol{\hat{\alpha}_u}
 \]
 
-The correlation matrix $\boldsymbol{\Sigma_G}$ is obtained from a reference panel such as 1000 Genomes.  A shrinkage penalty (equivalent to ridge regression) can be imposed by multiplying the off-diagonal elements of $\boldsymbol{\Sigma_G}$ by a number between 0 and 1.  Where the correlation matrix is singular or ill-conditioned, a pseudo-inverse can be used to calculate the multivariable coefficients.  
+The correlation matrix $\boldsymbol{\Sigma_G}$ is obtained from a reference panel such as 1000 Genomes.  A shrinkage penalty (equivalent to ridge regression) can be imposed by adding a penalty factor to the diagonal elements of $\boldsymbol{\Sigma_G}$.  Where the correlation matrix is singular or ill-conditioned, a pseudo-inverse can be used to calculate the multivariable coefficients.  For an individual with genotypes $\boldsymbol{G}$ at the exposure-associated SNPs, a locus-specific score $S$ predicting the exposure is calculated as $\boldsymbol{G} \cdot \boldsymbol{\hat{\alpha}_m}$.
 
-Where we have individual-level data on the association between genotype and outcome are available, as in the example used in this paper, each individual's locus-specific score $S$ is calculated as $\boldsymbol{G} \cdot \boldsymbol{\hat{\alpha}_m}$, where $\boldsymbol{G}$ is the vector of the individual's genotypes.  
-
-Because $S$ is calculated from the genotypes and and the coefficients for the effect of genotypes on exposure, we cannot use it as a genotypic instrument $Z$ in the model. We can factor the dot product $\boldsymbol{G} \cdot \boldsymbol{\hat{\alpha}_m}$ as the product of two scalars: the magnitude of the multivariable coefficient vector $\lVert \boldsymbol{\hat{\alpha}_m} \rVert$ and a pseudo-genotype $\lVert \boldsymbol{G} \rVert \rho_{G, \boldsymbol{\hat{\alpha}_m}}$, where $\rho_{G, \boldsymbol{\hat{\alpha}_m}}$ is the correlation between $\boldsymbol{G}$ and $\boldsymbol{\hat{\alpha}_m}$, geometrically equivalent to the cosine of the angles between these vectors. We can then substitute $\lVert \boldsymbol{\hat{\alpha}_m} \rVert$ for the scalar coefficient estimate $\hat{\alpha}$ and $S / \lVert \boldsymbol{\hat{\alpha}_m} \rVert$ for the scalar instrument $Z$ as a pseudo-genotype in the statistical model.  An estimate of the coefficient $\hat{\gamma}$ for the scalar instrument $Z$ and its standard error can be estimated directly by fitting a regression of $Y$ on $Z$.  The derived coefficient for the estimated effect of the instrument on the exposure is always positive; flipping the coding of the alleles would flip the sign of $\rho_{G,\alpha}$.  
-
-We can calculate the standard error of $\hat{\alpha}$ as $1 / \sqrt{\mathcal{I}_\alpha}$ where $\mathcal{I}_{\alpha}$ is the Fisher information on the slope of the linear regression of $X$ on $Z$, given by 
+Because the score $S$ is calculated from the genotypes and the genotype-exposure coefficients, we cannot use it as a genotypic instrument in a model of the relationship of the genotype-outcome coefficients to the genotype-exposure coefficients.  We can factor the dot product $\boldsymbol{G} \cdot \boldsymbol{\hat{\alpha}_m}$ as the product of two scalars: the magnitude of the multivariable coefficient vector $\lVert \boldsymbol{\hat{\alpha}_m} \rVert$ and a pseudo-genotype $\lVert \boldsymbol{G} \rVert \rho_{G, \boldsymbol{\hat{\alpha}_m}}$, where $\rho_{G, \boldsymbol{\hat{\alpha}_m}}$ is the correlation between $\boldsymbol{G}$ and $\boldsymbol{\hat{\alpha}_m}$, geometrically equivalent to the cosine of the angles between these vectors. We can then substitute $\lVert \boldsymbol{\hat{\alpha}_m} \rVert$ for the scalar coefficient estimate $\hat{\alpha}$ and $S / \lVert \boldsymbol{\hat{\alpha}_m} \rVert$ for the scalar instrument $Z$ as a pseudo-genotype in the statistical model.  The derived coefficient for the estimated effect of the instrument on the exposure is always positive; flipping the coding of the alleles would flip the sign of $\rho_{G,\alpha}$. We can calculate the standard error of $\hat{\alpha}$ as $1 / \sqrt{\mathcal{I}_\alpha}$ where $\mathcal{I}_{\alpha}$ is the Fisher information on the slope of the linear regression of $X$ on $Z$, given by 
 
 \[
-\mathcal{I}_{\alpha} = N_{XG} \frac{\textrm{Var} \left( Z \right) }{\sigma_X^2 - \hat{\alpha}^2 \textrm{Var} \left( Z \right) }
+\mathcal{I}_{\alpha} = N_{\alpha} \frac{\textrm{Var} \left( Z \right) }{\sigma_X^2 - \hat{\alpha}^2 \textrm{Var} \left( Z \right) } \enspace,
 \]
 
-where $N_{XG}$ is the sample size of the study from which the estimated univariate coefficients $\boldsymbol{\hat{\alpha}_u}$ were obtained, $\textrm{Var} \left( Z \right)$ is the variance of the scalar instrument $Z$ estimated in a reference panel, and $\sigma_X^2$ is the variance of the exposure $X$.  If an estimate of $\sigma_X^2$ is not given, it can be calculated from the standard error of one of the univariate coefficients, the variance of the corresponding SNP genotype in the reference panel and the sample size $N_{XG}$. 
-
-Where only summary-level data are available for the genotype-outcome associations, an estimate $\hat{\gamma}$ of the coefficient for the effect of the scalar instrument $Z$ on the outcome and its standard error can be obtained using individual-level genotype data from a reference panel.  First, the vector $\boldsymbol{\hat{\gamma}_m}$ of estimated multivariable coefficients is calculated by premultiplying the estimates $\boldsymbol{\hat{\gamma}_u}$ of the univariate coefficients by $\boldsymbol{\Sigma_G^{-1}}$. The coefficient $\hat{\gamma}$ for the scalar instrument $Z$ is then be estimated by minimizing the sum of the squared differences between the predictor calculated from $Z$ and the linear predictor calculated from the vector of genotypes $\boldsymbol{G}$, where the sum is taken over the genotypes of all $n$ individuals in the reference panel.  
+where $N_{\alpha}$ is the sample size of the study from which the estimated univariate coefficients $\boldsymbol{\hat{\alpha}_u}$ were obtained, $\textrm{Var} \left( Z \right)$ is the variance of the scalar instrument $Z$ estimated in a reference panel, and $\sigma_X^2$ is the variance of the exposure $X$.  If an estimate of $\sigma_X^2$ is not given, it can be calculated from the allele frequency $a_j$ of the $j$th SNP, the standard error $s_{G(j)}$ of the $j$th univariate coefficient estimate $\hat{\alpha}_{u(j)}$, and the sample size $N_{\alpha}$ as 
 
 \[
-\sum_{i=1}^n \left( \hat{\gamma} Z_i - \boldsymbol{G}_i \cdot \boldsymbol{\hat{\gamma}_m} \right)^2
-\]
+\sigma_X^2 = 2 a_j \left( 1 - a_j \right) \left( N_{\alpha} s_{G(j)}^2 + \alpha_{u(j)}^2 \right)\enspace.
+\] 
 
-Equating to zero the derivative of this expression with respect to $\hat{\gamma}$, substituting $\lVert \boldsymbol{G_i} \rVert \rho_{G, \boldsymbol{\hat{\alpha}_m}}$ for $Z_i$ and factoring the dot product $\boldsymbol{G}_i \cdot \boldsymbol{\hat{\gamma}_m}$ as $\lVert \boldsymbol{G}_i \rVert \rho_{\boldsymbol{G}_i, \boldsymbol{\hat{\gamma}_m}} \lVert \boldsymbol{\hat{\gamma}_m} \rVert$ we obtain
-\[
-\hat{\gamma} = \lVert \boldsymbol{\hat{\gamma}_m} \rVert \frac{\sum_{i=1}^n \rho_{\boldsymbol{G}_i, \boldsymbol{\hat{\gamma}_m}} \lVert \boldsymbol{G}_i \rVert^2 \rho_{G_i, \boldsymbol{\hat{\alpha}_m}}}{\sum_{i=1}^n \lVert \boldsymbol{G_i} \rVert^2 \rho_{G_i, \boldsymbol{\hat{\alpha}_m}}^2}
-\]
+An estimate $\hat{\gamma}$ of the coefficient for the effect of the scalar instrument $Z$ on the outcome $Y$ and its standard error can be obtained by fitting a regression of $Y$ on $Z$.  A method for calculating the instrument-outcome coefficient $\hat{\gamma}$ and its standard error from summary-level data for SNP-outcome coefficients is described in the Appendix, but not used in this paper.  
 
-The ratio of sums in this expression can be recognized as a weighted average of the ratio $\rho_{G_i, \boldsymbol{\hat{\gamma}_m}} / \rho_{G_i, \boldsymbol{\hat{\alpha}_m}}$, with weights $Z_i$.  The standard error of $\hat{\gamma}$ is $1 / \sqrt{\mathcal{I}_\gamma}$ where $\mathcal{I}_{\gamma}$ is the Fisher information on the slope of the regression of $Y$ on $Z$, given (for a logistic regression model) by 
-
-\[
-\mathcal{I}_{\gamma} = N_{YG} \textrm{Var} \left( Z \right) p \left( 1 - p \right) 
-\]
-
-where $N_{YG}$ and $p$ are respectively the total sample size and the the proportion of cases in the dataset from which the estimated coefficients $\boldsymbol{\hat{\gamma}_u}$ were obtained. 
-
-For each instrument we standardize the pseudo-genotypes $Z$ to unit variance and scale the coefficient estimates accordingly, so that the instruments are exchangeable and their direct effects can be modelled as independently and identically distributed. 
+For each instrument we standardize the pseudo-genotypes $Z$ to unit variance and scale the coefficient estimates accordingly, so that the variance explained by the $j$th linear predictor $Z_j \hat{\alpha}_j$, which can be interpreted as the "strength of the instrument", is proportional to the square of the scalar coefficient $\hat{\alpha}_j$.  The prior on the scale of the pleiotropic effects $\boldsymbol{\beta}$ of the instruments $Z$ is thus independent of the strength of the instrument.  
 
 ## Example: effect of adiponectin on type 2 diabetes
-As an example, we examine the effect of adiponectin, encoded by the _ADIPOQ_ gene, on the risk of type 2 diabetes. Of four previous studies using Mendelian randomization to investigate the relation of adiponectin levels to type 2 diabetes, two reported no evidence of a causal effect [@yaghootkar_mendelian_2013;;@chen_effects_2020] and two reported that a causal effect was supported [@nielsen_low_2021;@zhang_causal_2022].  
+As the methods described above overcome some of the limitations of standard methods for design and analysis of Mendelian randomization studies, they may help to resolve contradictory results obtained in earlier studies.  As an example, we examine the effect of adiponectin, encoded by the _ADIPOQ_ gene, on the risk of type 2 diabetes.  Low adiponectin levels are strongly associated with type 2 diabetes.  Of four previous studies using Mendelian randomization to investigate whether low adiponectin levels cause type 2 diabetes, two reported no evidence of a causal effect [@yaghootkar_mendelian_2013;;@chen_effects_2020] and two reported evidence for a causal effect [@nielsen_low_2021;@zhang_causal_2022].  We obtained coefficient estimates for the effects of SNPs on circulating levels of adiponectin from two studies: 
 
-We obtained coefficient estimates for the effects of SNPs on circulating levels of adiponectin from two studies: 
+* The DeCODE study of 35559 Icelanders in which 4719 proteins on the SomaLogic v4 panel were measured in plasma [@ferkingstad_largescale_2021].  `r length(bad.gwasids)` aptamers on this platform that appeared to cross-react with complement factor H were excluded.  The criteria for identifying these aptamers were: a _trans_-pQTL at the _CFH_ locus and no _cis_-pQTL for the protein that the aptamer was designed to detect and association of the _trans_- score with age-related macular degeneration. 
 
-* 4719 proteins on the SomaLogic v4 panel measured in plasma on 35559 Icelanders in the DeCODE study [@ferkingstad_largescale_2021].  `r length(bad.gwasids)` aptamers on this platform that appeared to cross-react with complement factor H were excluded.  The criteria for identifying these aptamers were: a _trans_-pQTL at the _CFH_ locus, no _cis_-pQTL for the protein that the aptamer was designed to detect, and the _trans_- score was associated with age-related macular degeneration. 
+* The UK Biobank proteomics study of 54306 individuals in which 2924 proteins on the Olink Explore panel were measured in plasma [@sun_plasma_2023]
 
-* 2924 proteins on the Olink Explore panel measured in plasma on 54306 participants in UK Biobank [@sun_plasma_2023]
+The calculated standard deviation of adiponectin levels was `r scoresinfo.gene[study=="DeC", round(sqrt(median.totalvar.study)[1], 2)]` in the DeCODE dataset and `r scoresinfo.gene[study=="UKB", round(sqrt(median.totalvar.study)[1], 2)]` in the UK Biobank dataset.  In each genomic region where there was at least one SNP-exposure association with $p < 10^{-6}$, all SNPs with $p < 10^{-6}$ separated by no more than 1 Mb were included in the calculation of the multivariable coefficient vector. This yielded `r scoresinfo.gene[study=="DeC", .N]` unlinked genotypic instruments from the DeCODE study, calcuated from `r scoresinfo.gene[study=="DeC", sum(n_snps)]` SNPs, and `r scoresinfo.gene[study=="UKB", .N]` instruments from the UK Biobank proteomics study, calculated from `r scoresinfo.gene[study=="UKB", sum(n_snps)]` SNPs.  Each instrument was annotated with a list of nearby genes, and the genes on each list were matched to a list of 256 genes for which SNP associations with type 2 diabetes have been reported at $p < 5 \times 10^{-8}$, extracted from GWAS Catalog.  
 
-In each genomic region where there was at least one SNP-exposure association with $p < 10^{-6}$, all SNPs with $p < 10^{-6}$ separated by no more than 1 Mb were included in the calculation of the multivariable coefficient vector and the locus-specific instrument $S$. _Cis_-QTLs were excluded. This yielded `r scoresinfo.gene[study=="DeC", .N]` unlinked genotypic instruments from the DeCode study, calcuated from `r scoresinfo.gene[study=="DeC", sum(n_snps)]` SNPs, and `r scoresinfo.gene[study=="UKB", .N]` instruments from the UK Biobank proteomics study, calculated from `r scoresinfo.gene[study=="UKB", sum(n_snps)]` SNPs.  
+The target dataset with genotypes and type 2 diabetes status was the UK Biobank cohort.  Ethical approval for the UK Biobank study was granted in 2011 by the North West Multi-centre Research Ethics Committee (11/NW/0382), and renewed every five years since then. Informed consent was obtained for all participants in UK Biobank.  The work described herein was approved by the UK Biobank under application number 23652. 
 
-The target dataset with genotypes and type 2 diabetes was the UK Biobank.  Ethical approval for the UK Biobank was previously obtained from the North West Centre for Research Ethics Committee (11/NW/0382). Informed consent was obtained for all participants in UK Biobank.  The work described herein was approved by the UK Biobank under application number 23652. 
+Separate analyses were undertaken using the instruments constructed from these two proteomics studies.  When using instruments obtained from the UK Biobank proteomics study, the 54306 participants who were in the proteomics study were excluded from the target dataset.
 
-Separate analyses were undertaken using the instruments constructed from the DeCode and UK Biobank proteomics studies.  When using the instruments obtained from the UK Biobank proteomics study, the 54306 participants who were in the proteomics study were excluded from the target dataset. There is thus no overlap between those in step 1 and those in step 2. 
-
-**redo analysis restricted to unrelated Eur ancestry individuals**
-
-Of `r N.indiv` individuals with nonmissing phenotype and genotype data in UK Biobank, `r N.cases` were classified as cases of `r long.phenoname`.  
+Because the individuals in the proteomics studies were predominantly of European ancestry, the target dataset was restricted to individuals of European ancestry.  Of `r N.indiv` unrelated individuals with nonmissing phenotype and genotype data, `r N.cases` were classified as cases of `r long.phenoname` and the all others were classified as noncases. 
 	
-For each instrument, the pseudo-genotypes were standardized to unit variance.  The scale factor for the prior on the pleiotropic effects is thus independent of the "strength of the instrument" (which is proportional to the variance of the linear predictor of the exposure).  For each genetic instrument, a logistic regression model was fitted with type 2 diabetes as outcome variable and with sex, the first five principal components, and the standardized pseudo-genotype as covariates.  
+For each instrument, the pseudo-genotypes were standardized to unit variance and a logistic regression model was fitted with type 2 diabetes as outcome variable.  The other covariates were sex and the first five principal components of the SNP relationship matrix.  The coefficients for the effect of each scalar instrument on type 2 diabetes were used to fit the model.  _Cis_-pQTLs were excluded.  As described in the Appendix, the regularized horseshoe requires us to specify priors on two parameters: the scale $s_\textrm{global}$ of the prior on the global shrinkage parameter, which encodes a guess of the fraction $f$ of genetic instruments that have nonzero pleiotropic effects, and the scale $s_\textrm{slab}$ of the prior on the regularization parameter, which encodes information about the likely size of these nonzero pleiotropic effects.  For an initial analysis we set $s_\textrm{global}$ based on a guess that $f = 0.2$, and set $s_\textrm{slab} = 0.25$.  The sensitivity of the results to these prior settings was examined by repeating the model fitting with $s_\textrm{slab}$ set based on a guess that $f = 0.8$, and $s_\textrm{slab} = 0.025$.  
 
-To display the effects of each instrument visually, the maximum likelihood estimate and standard error of each coefficient ratio was calculated using the delta method, based on Taylor expansions for the moments of the distribution of the ratio of two independent normally-distributed variables, to correct for uncertainty in the denominators of the coefficient ratios. . Three widely-used estimators for the causal effect were calculated from the coefficient ratios: inverse-weighted mean, weighted median estimate, and penalized weighted median.  These estimators were calculated without correction for uncertainty in the denominators of the ratios, as this is not recommended.  
+For comparison with inference based on the marginal likelihood of the causal effect parameter, three widely-used estimators for the causal effect were calculated from the coefficient ratios: the inverse-variance weighted mean, the weighted median, and the penalized weighted median.  <!--The coefficient ratios and their standard errors were calculated by the delta method, based on second-order Taylor expansions for the moments of the distribution of the ratio of two independent normally-distributed variables.--> 
 
 ## Results 
-Table \ref{tab:coeffs} shows summary statistics for the genetic instruments for adiponectin derived from each pQTL study.  There is suprisingly little overlap between the 12 _trans_-pQTLs detected in the DeCODE study and the 15 _trans_-pQTLs detected in UK Biobank.  Only three QTLs -- a gene-poor region at 163.3 Mb on chromsome 6, _ADRB1_, and _MIR6813_ -- were detected in both studies at a threshold of $p < 10^{-6}$.  This may reflect the low power to detect weak _trans_-pQTLs even in these large datasets.  In the DeCode study there is both a _cis_-QTL at the _ADIPOQ_ transcription site and an extended _cis_-pQTL 2 Mb upstream.  
+Table \ref{tab:coeffs} shows summary statistics for the genetic instruments for adiponectin derived from each pQTL study.  There is suprisingly little overlap between the `r scoresinfo.gene[qtl_type=="trans" & study=="DeC", .N]` _trans_-pQTLs detected in the DeCODE study and the `r scoresinfo.gene[qtl_type=="trans" & study=="UKB", .N]` _trans_-pQTLs detected in UK Biobank.  Only eleven _trans_-pQTLs -- gene-poor regions at 219.4 Mb on chromosome 1, 34.2 Mb on chr 6, 139.5 Mb on chromosome 6, and regions containing _ALAS1_, _ADRB1_, _SPON1_, _PDE3A_, _ABCB9_, _CDH13_, _AKR1B1P7_, and _MIR6813_ -- were detected in both studies at a threshold of $p < 10^{-6}$.  This may reflect the low power to detect weak _trans_-pQTLs even in these large datasets.  In both studies there is a _cis_-QTL at the _ADIPOQ_ transcription site.  In the DeCODE study an extended _cis_-pQTL is detected 2 Mb upstream of the transcription site.  Only two pQTLs -- _SPON1_ and _APOC1_ -- contained genes that were listed in GWAS Catalog as associated with type 2 diabetes.  
 
-Figure \ref{fig:plot.instruments} shows that 11 of 12 _trans_-pQTL instruments from DeCode and 14 of 15 _trans_-pQTL instruments from UKBB are inversely associated with type 2 diabetes. The _cis_-pQTL instruments however are not associated with type 2 diabetes.  
+Figure \ref{fig:plot.instruments} shows that `r coeffs.dt[[1]][qtl_type=="trans" & sign(thetaIV)==-1, .N]` of `r coeffs.dt[[1]][qtl_type=="trans", .N]` _trans_-pQTL instruments from DeCODE and `r coeffs.dt[[2]][qtl_type=="trans" & sign(thetaIV)==-1, .N]` of `r coeffs.dt[[2]][qtl_type=="trans", .N]` _trans_-pQTL instruments from UKBB are inversely associated with type 2 diabetes. The _cis_-pQTL instruments are not associated with type 2 diabetes.  
 
-Supplementary Figure \ref{fig:density} shows the posterior distribution and log-likelihood of the causal effect parameter.  As expected, the posterior distribution is approximately Gaussian and the log-likelihood is well approximated by a quadratic.  Supplementary Table \ref{tab:posteriorsummaries} shows posterior summaries of the model parameters.  Although the prior on the global shrinkage parameter was set based on a guess that about 20% of instruments would have nonzero pleiotropic effects, the model-fitting infers the effective number $m$ of nonzero pleiotropic effects in each study to be about half the total number of instruments in each study. Of the instruments from the DeCode proteomics study, a large pleiotropic effect is inferred only for the _APOC1_ locus.  Of the instruments from the UK Biobank proteomics study, large pleiotropic effects are inferred for the _CDH13_, _CCND2_ and _BCL2_ loci.  
+Table \ref{tab:estimates} shows the estimates of the causal effect parameter obtained by each method, as log odds ratios for unit change in adiponectin levels.  The maximum likelihood estimates obtained by marginalizing over direct effects were `r round(result.DeC$Estimate, 2)` (95% CI `r round(result.DeC$cl.lower, 2)` to `r round(result.DeC$cl.upper, 2)`) using DeCODE instruments and `r round(result.UKB$Estimate, 2)` (95% CI `r round(result.UKB$cl.lower, 2)` to `r round(result.UKB$cl.upper, 2)`) using UK Biobank instruments.  In comparison with the weighted median or penalized weighted median estimators, the confidence intervals obtained from the likelihood function were wider and the _p_-values were more conservative.  
 
-Table \ref{tab:estimates} shows the estimates of the causal effect parameter obtained by each method.  The estimates obtained by marginalizing over direct effects do not differ much from those obtained with the weighted median or penalized weighted median estimators, but the _p_-values are more conservative.  
+Supplementary Figure \ref{fig:density} shows the posterior distribution and log-likelihood of the causal effect parameter.  As expected with this large sample size, the posterior distribution is approximately Gaussian and the log-likelihood is well approximated by a quadratic function.  Supplementary Table \ref{tab:posteriorsummaries} shows posterior summaries of the model parameters.  The posterior mean of the effective fraction $f$ of instruments that have nonzero pleiotropic effects was `r fit.coeffs.studies[[1]][variable=="f", mean]` (90% credible interval `r fit.coeffs.studies[[1]][variable=="f"][["10%"]]` to `r fit.coeffs.studies[[1]][variable=="f"][["90%"]]`) in a model using the DeCODE instruments and `r fit.coeffs.studies[[2]][variable=="f", mean]` (90% credible interval `r fit.coeffs.studies[[2]][variable=="f"][["10%"]]` to `r fit.coeffs.studies[[2]][variable=="f"][["90%"]]`) in a model using the UK Biobank instruments, somewhat higher than the prior guess that $f = 0.2$.  
+
+The standard deviation (evaluated as the square root of the posterior mean of the variance) of these nonzero pleiotropic effects was `r round(beta.scale[1, 4], 3)` for the DeCODE instruments and `r round(beta.scale[2, 4], 3)` for the UK Biobank instruments.  These values are far smaller than the prior guess that the scaling factor $s_{\textrm{slab}} = 0.25$.  
+
+Although the model fitting infers that about half the instruments have nonzero pleiotropic effects (Figure \ref{fig:plot.kappa}), only a few instruments were clearly identifiable as having nonzero pleiotropic effects.  Using an upper 90% credible limit of 0.25 for the shrinkage coefficient $\kappa$ to identify those instruments that had mostly escaped shrinkage, only two instruments from the DeCODE study (_ABCB9_, _APOC1_) and two instruments from the UK Biobank study (_CDH13_, _CCND2_) were clearly pleiotropic.  
+
+When the model fitting was repeated with prior settings changed as described in the Methods section, the maximum likelihood estimates and confidence intervals for $\theta$ differed only slightly from those obtained with the initial prior settings: `r round(alt.result.DeC$Estimate, 2)` (95% CI `r round(alt.result.DeC$cl.lower, 2)` to `r round(alt.result.DeC$cl.upper, 2)`) using DeCODE instruments and `r round(alt.result.UKB$Estimate, 2)` (95% CI `r round(alt.result.UKB$cl.lower, 2)` to `r round(alt.result.UKB$cl.upper, 2)`) using UK Biobank instruments. 
 
 # Discussion
-Bayesian methods for marginalizing over the unobserved pleiotropic effects to infer the causal effect parameter in a Mendelian randomization study have been described previously [@berzuini_bayesian_2020;@grant_bayesian_2023a].  The methods described in this paper extend this approach (1) by allowing unlinked scalar genetic instruments to be constructed from all SNPs associated with the exposure without having to restrict to one SNP from each genomic region; (2) by using a regularized horseshoe prior which encodes our experience that genetic effects of a single genomic region on a complex trait are usually small; and (3) by obtaining classical hypothesis tests based on the likelihood of the causal effect parameter.  The difficulties associated with using ratios of coefficients to construct estimators are eliminated in a Bayesian framework, where nothing is "estimated".  Thus there is no need to exclude "weak instruments".  This makes it possible to integrate Mendelian randomization into genome-wide aggregated _trans_- effects analysis, which identifies core genes on which the weak effects of many _trans_-eQTLs or coalesce to affect complex traits [@iakovliev_genomewide_2023]. In this approach, the genetic instruments are clumps of SNPs with _trans_- effects on the expression of a gene as transcript or circulating protein.  
+Bayesian methods for marginalizing over the unobserved pleiotropic effects to infer the causal effect parameter in a Mendelian randomization study have been described previously [@berzuini_bayesian_2020;@grant_bayesian_2023a].  The methods described in this paper extend this approach: (1) by allowing unlinked scalar genetic instruments to be constructed from all SNPs associated with the exposure without having to restrict to one SNP from each genomic region; (2) by using a regularized horseshoe prior which allows encoding of prior knowledge that genetic effects of a single genomic region on a complex trait are usually small; and (3) by constructing classical hypothesis tests based on the likelihood of the causal effect parameter.  
 
-Using _trans_-pQTLs as instruments, there is clear support for a causal effect of low adiponectin levels on type 2 diabetes.  This is apparent even without a formal statistical analysis, as the sign of the effect of the instrument on the outcome is negative for 11 of 12 unlinked _trans-_ instruments derived from the DeCode study and for 14 of 15 instruments derived from the UK Biobank proteomics study.  A strength of this study is the agreement between results using two different pQTL studies that used different assays for the protein and generated mostly non-overlapping instruments.  Earlier studies that failed to detect a causal effect were restricted to _cis_-acting SNPs [@yaghootkar_mendelian_2013;;@chen_effects_2020].  We confirm that instruments constructed from _cis_- acting SNPs have no effect on type 2 diabetes.  Some of these SNPs affect not only the measured levels but also the splicing of the gene product [@lee_functional_2016], so their associations with levels of circulating protein are difficult to interpret without more information about the specificity of the assay for different splice variants and the effects of these splice variants on the function of the protein.  Low adiponectin levels are strongly associated with type 2 diabetes.  In a a transgenic mouse model increased expression of adiponectin protects against diabetes [@yamauchi_globular_2003].  Misleading results from these _cis_- Mendelian randomization studies may have discouraged development of a promising drug target: though adiponectin analogues have been studied experimentally, none has reached the clinical stage of drug development.  
+The difficulties associated with using ratios of coefficients to construct estimators are eliminated in a Bayesian framework, where nothing is "estimated".  Where the log-likelihood is asymptotically quadratic, statistical theory guarantees that the maximum-likelihood estimate has the sampling properties that are desirable for an estimator: consistency, minimum variance and unbiasedness. Where the log-likelihood is not approximately quadratic, it is preferable to base inference directly on the likelihood function rather than on the sampling properties of an estimator.  Because Bayesian inference does not rely on the sampling properties of ratios, there is no need to exclude "weak instruments".  This makes it possible to integrate Mendelian randomization into genome-wide aggregated _trans_- effects analysis, which attempts to identify core genes on which the polygenic effects of many variants coalesce via _trans_- effects to influence complex traits [@iakovliev_genomewide_2023]. In this approach, the genetic instruments are clumps of SNPs with _trans_- effects on the expression of a gene as transcript or circulating protein.  
 
-Most of the SNP heritability of gene expression is attributable to _trans_- effects [@ouwens_characterization_2020].  Where, as in this example, the exposure under study is a gene transcript or a circulating protein, some Mendelian randomization study designs that use only _cis_- acting variants as genetic instruments have been advocated.  The rationale for thse "_cis_-MR" designs is that _cis_- acting variants are less likely to have pleiotropic effects on the outcome that are not mediated through the level of the circulating protein [@schmidt_genetic_2020].  This supposition is questionable: especially where _cis_-acting variants affect the splicing of the transcript, the relationship between measured levels and functional activity of the protein may be broken.  Because _cis_- acting variants often have large effects on functional activity, for core genes it is likely that they are subject to purifying selection.  
+Using instruments constructed from _trans_-pQTLs in two different studies that used different assays for the protein, there is clear support for a causal effect of low adiponectin levels on type 2 diabetes.  This is apparent even without a formal statistical analysis, as the signs of the effects of the instruments are almost all negative.  Earlier studies that failed to detect a causal effect were restricted to _cis_-acting SNPs [@yaghootkar_mendelian_2013;;@chen_effects_2020]. Some of these _cis_- acting SNPs affect not only the measured levels but also the splicing of the gene product [@lee_functional_2016], so their effects on measured adiponectin levels do not necessarily correspond to effects on the functional protein.  The most direct human evidence for a causal effect of low adiponectin on type 2 diabetes comes from reports of families in which type 2 diabetes segregated with rare loss-of-function variants in _ADIPOQ_ [@cook_hypoadiponectinemia_2010].  In the obese mouse model, overexpression of adiponectin in the liver protected against diabetes [@yamauchi_globular_2003].  Though adiponectin analogues have been studied experimentally, none has reached the clinical stage of drug development.  Misleading results from _cis_- Mendelian randomization studies may have discouraged development of a possible drug target. 
 
-In a Mendelian randomization study with multiple instruments that may have unobserved pleiotropic effects, the causal effect parameter is not identifiable.  Bayesian hypothesis testing is based on the Likelihood Principle that all information conveyed by observations about evidence favouring one model or one parameter value over another is contained in the ratio of the likelihoods of these models or parameter values, given the observations.  In this example, the likelihood of a model with a causal effect parameter and only a few nonzero pleiotropic effects is higher than the likelihood of a model with no causal effect that requires more nonzero pleiotropic effect parameters to adjust to the data to obtain the same fit.  With horseshoe priors, which allow the distribution of the pleiotropic effects to be learned from the data, this model comparison is performed under the hood [@carvalho_horseshoe_2010], without the computational inconvenience of having to calculate the marginal likelihood by averaging over all possible partitions of the variables into two disjoint sets (spike and slab) as in the contamination mixture model [@burgess_robust_2020] or averaging over different settings of the number of nonzero effect parameters [@xue_constrained_2021.  A corollary of inference based on model comparison is that reliable inference of causality in the presence of pleiotropy requires a relatively large number of unlinked genetic instruments to allow learning the distribution of pleiotropic effects given a horseshoe prior.  
+Most of the SNP heritability of gene expression is attributable to _trans_- effects [@ouwens_characterization_2020].  Where, as in this example, the exposure under study is a gene transcript or a circulating protein, study designs that use only _cis_- acting variants as genetic instruments have been advocated [@schmidt_genetic_2020].  The rationale for thse "_cis_-MR" designs is that _cis_- acting variants are less likely to have pleiotropic effects on the outcome that are not mediated through the level of the circulating protein.  This supposition is questionable: especially where _cis_-acting variants affect the splicing of the transcript, the relationship between measured levels and functional activity of the protein may be broken.  Because _cis_- acting variants often have large effects on functional activity, _cis_- acting variants in core genes may be subject to purifying selection [@liu_trans_2019].  
 
-The likelihood-based approach to causal inference described in this paper is aligned with the not yet universally-accepted principle that causal inference is just a special case of statistical inference, requiring some attention to what is assumed about exchangeability between observations of exposure and outcome and predictions of the effect on the outcome of perturbing the exposure [@rohde_causal_2022].  In this decision-theoretic framework there is no need to invoke counterfactuals [@dawid_causal_2001] or to insist that causal effects must be expressed as marginal rather than as conditional effects.  
+Bayesian hypothesis testing is based on the Likelihood Principle that all information conveyed by observations that supports one model or one parameter value over another is contained in the ratio of the likelihoods of these models or parameter values.  The likelihood-based approach to causal inference described in this paper is aligned with the not yet universally-accepted principle that causal inference is just a special case of statistical inference, requiring attention when making assumptions about exchangeability between observations of exposure and outcome and predictions of the effect on the outcome of perturbing the exposure [@rohde_causal_2022].  In this decision-theoretic framework there is no need to invoke counterfactuals [@dawid_causal_2001] or to require causal effects to be expressed as marginal rather than as conditional effects.  In this example, the likelihood of a model with a causal effect parameter and only a few nonzero pleiotropic effects is higher than the likelihood of a model with no causal effect that requires more nonzero pleiotropic effect parameters to adjust to the data to obtain the same fit.  Thus even though the causal effect parameter is not identifiable because for any setting of the causal effect parameter we can find a setting of pleiotropic effect parameters that has the same fit to the data, a formal hypothesis test can be obtained.  With horseshoe priors, which allow the distribution of the pleiotropic effects to be learned from the data, this model comparison is performed "under the hood" [@carvalho_horseshoe_2010], without the computational inconvenience of having to average over all possible partitions of the variables into two disjoint sets (spike-and-slab) as in the contamination mixture model [@burgess_robust_2020] or over different settings of the number of nonzero effect parameters [@xue_constrained_2021].  A corollary of inference based on model comparison is that reliable inference of causality in the presence of pleiotropy requires a relatively large number of unlinked genetic instruments to allow learning the distribution of pleiotropic effects.  
 
-Guidelines for the design of Mendelian randomization studies have recently been updated [@burgess_guidelines_2023].  Based on the work presented here, some suggestions for revisions to these guidelines are listed below.  
+The statistical model assumes that the effects of the instruments on the exposure and their direct effects on the outcome are independent in magnitude and direction: this has been denoted the InSIDE (Instrument Strength Independent of Direct Effect) assumption [@bowden_mendelian_2015a] though this term has also been used for the less stringent assumption that "the magnitude of the pleiotropic effects are independent of the SNP-exposure associations" [@bowden_difficulties_2017]. With the procedure described here for constructing scalar instruments, the estimates for the coefficients of the instrument-exposure effects can take only positive values (a negative effect would simply correspond to flipping of the allele coding), and the direct effects are assumed to be distributed with zero mean. This assumption that the instrument-exposure effects and the direct effects are uncoupled in direction is termed "balanced pleiotropy".  It is possible in principle to infer a causal effect if the instrument-exposure effects and the direct effects are assumed to be uncoupled in magnitude even if they are coupled in direction [@bowden_mendelian_2015a] but it is not obvious why this would be a biologically realistic assumption.  
 
-* Study designs that rely on using variants from a single genomic region are likely to give misleading results and should be deprecated.  Studies that have used "cis-Mendelian randomization" to study the effects of a gene transcript or gene product on a disease or trait should be repeated using multiple _trans_- QTLs as instruments.  Because _cis_- acting variants are likely to affect the function of the gene through mechanisms (such as altered splicing) other than the measured levels of the transcript or gene product, it is preferable to report the effects of the _cis_- QTL separately.   
+If the statistical model is extended to allow the instrument-exposure effects and the direct effects to be coupled in magnitude and direction, it is not possible to infer causality without other information about pleiotropy because models with and without a causal effect can fit the data equally well with the same number of adjustable parameters. It may be more useful to formulate and test possible hypotheses about mechanisms that could give rise to coupling of instrument-exposure effects with direct effects on the outcome, as this may identify a shared aetiological pathway.  For adiponectin and type 2 diabetes, for instance, coupling could arise if the pQTLs for adiponectin are QTLs for a trait such as obesity that causes low adiponectin levels and increased risk of type 2 diabetes. In this situation other circulating proteins such as leptin that are biomarkers for obesity would show a similar pattern of apparently causal pQTL effects on type 2 diabetes.  More generally, pQTLs that have pleiotropic effects should be detectable on a heat map of correlations between genotypic scores for multiple proteins or transcripts.   
+
+Guidelines for the design of Mendelian randomization studies have recently been updated [@burgess_guidelines_2023].  Based on the work described here, some suggestions for revisions to these guidelines are listed below.  
+
+* Study designs that rely on using variants from a single genomic region, for instance using only _cis_-acting variants to study the effects of a gene transcript or gene product on a disease or trait, are likely to give misleading results and should be deprecated. Because _cis_- acting variants are likely to affect the function of the gene through mechanisms (such as altered splicing) other than the measured levels of the transcript or gene product, it is preferable to report the effects of a _cis_- QTL separately.  
 
 * Summary statistics for SNP-exposure associations should be obtained from the largest available studies, to maximize the number of QTLs detected and thus the number of genetic instruments that can be constructed. 
 
-* Unless pleiotropic effects can be excluded (for instance where the biological effect of the instrument is well understood), inference of the causal effect should be based on marginalizing over the distribution of pleiotropic effects.  There is no need for the plethora of "outlier-robust" methods, as marginalization using summary statistics takes only a few seconds of compute time using modern tools for Bayesian computation.  The model-fitting can easily be integrated into existing platforms for Mendelian randomization analysis. 
-<!--
-45 mendelian randomization AND protein AND (circulating OR plasma OR serum) AND cis- AND human
-931 mendelian randomization AND protein AND (circulating OR plasma OR serum) AND human
-112 mendelian randomization AND protein AND (circulating OR plasma OR serum) AND human AND bristol
--->
-
-\newpage
+* Unless pleiotropic effects can be excluded (for instance where the biological effect of the genetic variant is well understood), the method of choice for inference of the causal effect is to marginalize over the distribution of pleiotropic effects, which using summary statistics with modern tools for Bayesian computation takes only a few seconds. There is no need for a plethora of "outlier-robust" methods, as sensitivity to prior guesses about the distribution of pleiotropic effects can be examined directly.  The model-fitting algorithms can easily be integrated into existing platforms for Mendelian randomization analysis that use only summary statistics. 
 
 # Declarations 
-
 # Data and code availability
-A `Stan` script for fitting the Bayesian model used in this example is available at ...
+A `Stan` script for fitting the Bayesian model used in this paper, together with the summary-level data used in this paper, is available at https://github.com/molepi-precmed/mrhevo.
 
 # Acknowledgements 
-No specific funding was received for this work.  The development of the GENOSCORES platform was supported by a Springboard Award (SBF006/1109) from the Academy of Medical Sciences, supported in turn by the Wellcome Trust, the UK Government Department of Business, Energy and Industrial Strategy, the British Heart Foundation, and Diabetes UK.
+No specific funding was received for this work. This research has been conducted using the UK Biobank Resource under application number [23652]. The development of the GENOSCORES platform was supported by a Springboard Award (SBF006/1109) to AS from the Academy of Medical Sciences, supported in turn by the Wellcome Trust, the UK Government Department of Business, Energy and Industrial Strategy, the British Heart Foundation, and Diabetes UK. AI was supported by the Medical Research Council Cross Disciplinary Fellowship (XDF) Programme (MC_FE_00035).
 
 # Declaration of interests
 The authors declare no competing interests.
 
 # Web resources
+GWAS Catalog: https://www.ebi.ac.uk/gwas/
 
 # References{-}
 <div id="refs"></div>
@@ -263,9 +245,15 @@ The authors declare no competing interests.
 
 ```{r plot.instruments, echo=FALSE, fig.width=6, fig.height=9, fig.cap=paste0("\\label{fig:plot.instruments}Plot of coefficients of regression of outcome on each instrument against coefficients of regression of exposure of each instrument. Size of each data point is inversely proportional to the standard error of the ratio estimate. The value of each estimator is shown as the slope of a line passing through the origin. Cis-QTLs are excluded from these estimates. ")}
 
+studies <- c("DeCODE", "UK Biobank")
+plots.coeffs.study[[1]] <- plots.coeffs.study[[1]] + coord_fixed(ratio=1.5)
+plots.coeffs.study[[2]] <- plots.coeffs.study[[2]] + coord_fixed(ratio=1.5) +
+    theme(legend.position="none")
+p.coeffs.bystudy <- cowplot::plot_grid(plotlist=plots.coeffs.study, ncol=1, labels=studies)
 p.coeffs.bystudy
 
 ```
+
 
 \newpage
 
@@ -279,12 +267,38 @@ p.kappa.bystudy
 \newpage
 
 # Tables
+\small
+
 ```{r table.coeffs, echo=FALSE, warning=FALSE, message=FALSE}
+
+shorten.string.commas <- function(x) {
+    if(!is.na(x)) {
+        x <- trimws(unlist(strsplit(x, split=",")))
+        L <- length(x)
+        x.dt <- data.table(x)
+        x.dt[, rownum := .I]
+        x.dt[, gwas.hit := x %in% gwas.hits]
+        x.dt[gwas.hit==TRUE, x := paste0("\\textbf{", x, "}")]
+        x.dt <- x.dt[rownum < 3 | .N - rownum < 3 | gwas.hit]
+ #       if(x.dt[, .N] > 5) {
+ #           x <- c(x.dt[1:2, x], "...", x.dt[(L - 1):L, x])
+ #       }
+        x <- paste(x.dt$x, collapse=",")
+    }
+    return(x)
+}
+    
+shorten.list.commas <- function(v) {
+    z <- sapply(X=v, FUN=shorten.string.commas)
+    return(z)
+}
 
 coeffs.table <- rbindlist(coeffs.dt)[, .(study, chrom_int,
                                          startpos=round(startpos * 1E-6, 1),
+                                         endpos=round(endpos * 1E-6, 1),
                                          gsub(",", ", ",
-                                              gsub("_", "\\\\_", nearby_genes)),
+                                              gsub("_", "\\\\_",
+                                                   shorten.list.commas(nearby_genes))),
                                          round(beta_YZ, 3),
                                          round(SE_YZ, 3), 
                                          round(alpha_hat, 4),
@@ -295,19 +309,27 @@ kable(coeffs.table,
       escape=FALSE,
       linesep = c(rep("", nrow(coeffs.dt[[1]]) - 1), "\\addlinespace"),
       booktabs=TRUE,
-      longtable=FALSE,
-      col.names=c("Study", "Chr", "Mb", "Nearby genes",
+      longtable=TRUE,
+      col.names=c("Study", "Chr", "Start (Mb)", "End (Mb)", "Nearby genes",
                   "$\\hat{\\gamma}$", "SE($\\hat{\\gamma}$)",
                   "$\\hat{\\alpha}$", "SE($\\hat{\\alpha}$)",
                   "$\\hat{\\theta}$"),
       label="coeffs",
       caption=paste("Summary statistics for regression of outcome and exposure on genetic instruments")) %>%
-  column_spec(1, width="1cm") %>% 
-  column_spec(4, width="10cm", italic=TRUE) %>% 
+  footnote(general_title="",
+           threeparttable=TRUE,
+           footnote_as_chunk = TRUE,
+           general=paste("Genes in bold are those for which GWAS Catalog lists associations  with type 2 diabetes detected at $p < 5 \times 10^{-8}$."),
+          escape=FALSE) %>% 
+  column_spec(1, width="0.8cm") %>% 
+  column_spec(2, width="1cm") %>% 
+  column_spec(3, width="1cm") %>% 
+  column_spec(4, width="1cm") %>% 
+  column_spec(5, width="5cm", italic=TRUE) %>% 
     kable_styling(latex_options=c("HOLD_position", "scale_down")) 
 
 ```
-
+\normalsize
 \newpage
 
 ```{r table.estimates, echo=FALSE, warning=FALSE, message=FALSE}
@@ -323,7 +345,7 @@ kable(methods.dt[, .(study, Estimator,
       longtable=FALSE,
       col.names=c("QTL study", "Estimator", "Estimate", "95\\% CI", "pvalue"),
       label="estimates",
-      caption=paste("Comparison of parameter estimates with different methods")) %>%
+      caption=paste("Comparison of parameter estimates obtained with different methods")) %>%
     kable_styling(latex_options=c("HOLD_position")) 
 
 ```
@@ -352,31 +374,51 @@ Half-Cauchy priors are specified on the unregularized local scale parameters $\l
 A weakly informative gamma prior is specified for the regularization parameter $\eta$: 
 
 \[
-\eta \sim \textrm{Gamma} \left( 0.5 \nu_{\textrm{slab}}, 0.5 \nu_{\textrm{slab}} s_{\textrm{slab}}^2 \right)
+\eta \sim \textrm{Gamma} \left( 0.5 \nu_{\textrm{slab}}, 0.5 \frac{\nu_{\textrm{slab}}}{s_{\textrm{slab}}} \right)
 \]
 
-For the $j$th instrument, the _shrinkage coefficient_ $\kappa_j$ is 
+For the $j$th instrument, the shrinkage coefficient $\kappa_j$ is 
 
 \[
 \kappa_j = \frac{1}{1 + \tilde{\lambda}_j^2}
 \]
 
-This takes values from 0 (no shrinkage) to 1 (complete shrinkage).  The prior on the shrinkage coefficients has a horseshoe shape. The effective number $m$ of nonzero coefficients is  
+This takes values from 0 (no shrinkage) to 1 (complete shrinkage).  The prior on the shrinkage coefficients has a horseshoe shape. The effective fraction $f$ of nonzero coefficients is 
 
 \[
-m = \sum_{j=1}^J{\left( 1 - \kappa_j \right)}
+f = \frac{1}{J}\sum_{j=1}^J{\left( 1 - \kappa_j \right)}
 \]
 
-The heavy tail of the half-Cauchy priors on $\lambda_j$ allows some of the regression coefficients to escape the shrinkage imposed by small values of the global parameter $\tau$.  These nonzero coefficients are the slab component of the spike and slab distribution.  Their scale is regularized by the parameter $\eta$.  Even the largest coefficients will be regularized as a Gaussian with variance $\eta$.  
+The heavy tail of the half-Cauchy priors on $\lambda_j$ allows some of the regression coefficients to escape the shrinkage imposed by small values of the global parameter $\tau$.  These nonzero coefficients are the slab component of the spike-and-slab distribution.  Their scale is regularized by the parameter $\eta$.  Even the largest coefficients will be regularized as a Gaussian with variance $\eta$.  
 
-The value of $\nu_{\textrm{slab}}$ controls the shape of the distribution of $\eta$.  Piironen and Vehtari recommend setting $\nu_{\textrm{slab}}=1$, but their applications are to models with high-dimensional predictors where there is enough information to learn reliably the value of $\eta$ from the data.  For Mendelian randomization analyses where the number of genetic instruments is typically less than 20, we have set $\nu_{\textrm{slab}}=2$ to regularize the sampler so that it does not wander into drawing very large values of $\eta$ which would override the regularization of nonzero effects imposed by the parameter $\eta$.  The scaling factor $s_{\textrm{slab}}$ is specified based on prior information about the expected size of the largest direct effects.  Based on prior information about the typical size of SNP effects on type 2 diabetes, we have set $s_{\textrm{slab}}=0.25$ for this example. 
+The value of $\nu_{\textrm{slab}}$ controls the shape of the distribution of $\eta$.  Piironen and Vehtari recommend setting $\nu_{\textrm{slab}}=1$, but their applications are to models with high-dimensional predictors where there is enough information to learn reliably the value of $\eta$ from the data.  For Mendelian randomization analyses there is rather less information in the data about the distribution of nonzero pleiotropic effects, though we usually know in advance that genotype-outcome coefficients are unlikely to be large.  To constrain $\eta$ so that the sampling algorithm does not diverge, we set $\nu_\textrm{slab}=2$.  The scaling factor $s_{\textrm{slab}}$ is specified based on prior information about the expected size of the largest direct effects.  
 
-Piironen and Vehtari [@piironen_sparsity_2017-1] show that the prior expectations of the shrinkage coefficients $\kappa_j$ and the fraction $f$ of coefficients that are nonzero depend on $\tau \sqrt{\mathcal{I}_{\beta}}$, where $\mathcal{I}_{\beta}$ is the Fisher information on the effect parameters $\beta_j$.  As sample size and information increase, a smaller value of $\tau$ is required to shrink small effects nearly to zero, rather than allowing them to escape into the slab component.  To keep our prior expectation of $f$ consistent, the scale of the prior on $\tau$ should vary inversely with $\sqrt{\mathcal{I}_{\beta}}$.  To set the prior median on $\tau$ to the value that it has when the fraction of nonzero coefficients is equal to its prior expectation $f$, we specify the scale factor $s_{\textrm{global}}$ as 
+Piironen and Vehtari [@piironen_sparsity_2017-1] show that the prior expectations of the shrinkage coefficients $\kappa_j$ and the effective fraction $f$ of coefficients that are nonzero depend on $\tau \sqrt{\mathcal{I}_{\beta}}$, where $\mathcal{I}_{\beta}$ is the Fisher information on the effect parameters $\beta_j$.  As sample size and information increase, a smaller value of $\tau$ is required to shrink small effects nearly to zero, rather than allowing them to escape into the slab component.  To keep our prior expectation of $f$ consistent, the scale of the prior on $\tau$ should vary inversely with $\sqrt{\mathcal{I}_{\beta}}$.  To set the prior median on $\tau$ to the value that it has when the fraction of nonzero coefficients is equal to its prior expectation $f$, we specify the scale factor $s_{\textrm{global}}$ as 
 \[
 	s_{\textrm{global}} = \frac{f}{\left( 1 - f \right) \sqrt{\mathcal{I}_{\beta}}} 
 \]
 
-For this Mendelian randomization analysis, we have used the information $\mathcal{I}_{\gamma}$ on the crude effects $\gamma_j$ to set the prior median on $\tau$, as we cannot calculate in advance the information $\mathcal{I}_{\beta}$ on the unobserved pleiotropic effects $\beta_j$.  This equates to a prior expectation on the fraction of nonzero coefficients that is lower than the specified value $f$.  Where, as in this example, there is enough information in the data that the inferred value of $m$ is not highly sensitive to the scale of the prior on $\tau$, this slight mis-specification of the prior does not matter.  
+For this analysis, we have used the information $\mathcal{I}_{\gamma}$ on the crude effects $\gamma_j$ to set the prior median on $\tau$ based on a guess of $f$, as we cannot calculate in advance the information $\mathcal{I}_{\beta}$ on the unobserved pleiotropic effects $\beta_j$ which will be somewhat less than $\mathcal{I}_{\gamma}$.  As described in this paper, the sensitivity of the results to this prior setting can be examined.  
+
+## Calculation of instrument-outcome coefficients from summary-level data
+Where only summary-level data are available for the genotype-outcome associations, an estimate $\hat{\gamma}$ of the coefficient for the effect of the scalar instrument $Z$ on the outcome and its standard error can be obtained using individual-level genotype data from a reference panel.  First, the vector $\boldsymbol{\hat{\gamma}_m}$ of estimated multivariable coefficients is calculated by premultiplying the estimates $\boldsymbol{\hat{\gamma}_u}$ of the univariate coefficients by $\boldsymbol{\Sigma_G^{-1}}$. The coefficient $\hat{\gamma}$ for the scalar instrument $Z$ is then estimated by minimizing the sum of the squared differences between the predictor calculated from $Z$ and the linear predictor calculated from the vector of genotypes $\boldsymbol{G}$, where the sum is taken over the genotypes of all $n$ individuals in the reference panel.  
+
+\[
+\sum_{i=1}^n \left( \gamma Z_i - \boldsymbol{G}_i \cdot \boldsymbol{\hat{\gamma}_m} \right)^2
+\]
+
+Equating to zero the derivative of this expression with respect to $\gamma$, substituting $\lVert \boldsymbol{G_i} \rVert \rho_{G, \boldsymbol{\hat{\alpha}_m}}$ for $Z_i$ and factoring the dot product $\boldsymbol{G}_i \cdot \boldsymbol{\hat{\gamma}_m}$ as $\lVert \boldsymbol{G}_i \rVert \rho_{\boldsymbol{G}_i, \boldsymbol{\hat{\gamma}_m}} \lVert \boldsymbol{\hat{\gamma}_m} \rVert$ we obtain
+\[
+\hat{\gamma} = \lVert \boldsymbol{\hat{\gamma}_m} \rVert \frac{\sum_{i=1}^n \rho_{\boldsymbol{G}_i, \boldsymbol{\hat{\gamma}_m}} \lVert \boldsymbol{G}_i \rVert^2 \rho_{G_i, \boldsymbol{\hat{\alpha}_m}}}{\sum_{i=1}^n \lVert \boldsymbol{G_i} \rVert^2 \rho_{G_i, \boldsymbol{\hat{\alpha}_m}}^2}
+\]
+
+The ratio in this expression can be recognized as a weighted average of the ratio $\rho_{G_i, \boldsymbol{\hat{\gamma}_m}} / \rho_{G_i, \boldsymbol{\hat{\alpha}_m}}$, with weights $Z_i^2$.  The standard error of $\hat{\gamma}$ is $1 / \sqrt{\mathcal{I}_\gamma}$ where $\mathcal{I}_{\gamma}$ is the Fisher information on the slope of the regression of $Y$ on $Z$, given (for a logistic regression model) by 
+
+\[
+\mathcal{I}_{\gamma} = N_{\gamma} \textrm{Var} \left( Z \right) p \left( 1 - p \right) 
+\]
+
+where $N_{\gamma}$ and $p$ are respectively the total sample size and the the proportion of cases in the dataset from which the coefficient estimates $\boldsymbol{\hat{\gamma}_u}$ were obtained. 
 
 \newpage
 
@@ -386,7 +428,7 @@ For this Mendelian randomization analysis, we have used the information $\mathca
 
 if(use.sampling) {
 pairs(hevo.stanfit.studies[[i]], pars=c("theta", 
-                     "log_c", "log_tau", "m_eff",
+                     "log_c", "log_tau", "f",
                      "lp__"))
 }
 
@@ -400,7 +442,7 @@ p.bayesianloglik.bystudy
 
 ```{r traceplot, echo=FALSE, fig.width=6, fig.height=6, fig.cap="\\label{fig:traceplot}Trace plots of sampling of parameters"}
 if(use.sampling) {
-    traceplot(fit.mc, pars=c("theta", "log_c", "log_tau", "m_eff", "lp__"),
+    traceplot(fit.mc, pars=c("theta", "log_c", "log_tau", "f", "lp__"),
               inc_warmup=FALSE)
 }
  
@@ -408,7 +450,6 @@ if(use.sampling) {
 
 \newpage
 ## Supplementary Tables
-
 ```{r settings.coeffs, echo=FALSE}
 
 if(FALSE) {
@@ -425,24 +466,23 @@ print(list(logistic=as.integer(logistic), N=N, U=U, J=J,
 }
 ```
 
-
 ```{r fit.coeffs, echo=FALSE}
 
 fit.coeffs.bystudy <- rbindlist(fit.coeffs.studies)
-
 fit.coeffs.bystudy[, variable := gsub("theta", "$\\\\theta$", variable)]
 fit.coeffs.bystudy[, variable := gsub("log\\_c", "$\\\\log{\\\\eta}$", variable)]
 fit.coeffs.bystudy[, variable := gsub("log\\_tau", "$\\\\log{\\\\tau}$", variable)]
-fit.coeffs.bystudy[, variable := gsub("m\\_eff", "$m$", variable)]
+fit.coeffs.bystudy[, variable := gsub("f", "$f$", variable)]
 fit.coeffs.bystudy[, variable := gsub("_", "\\\\_", variable)]
-kable(fit.coeffs.bystudy[, .(study, variable, mean, sd, `10%`, `90%`)],
+kable(fit.coeffs.bystudy[!grepl("kappa", variable), .(study, variable, mean, `10%`, `90%`)],
       escape=FALSE,
       linesep = c(rep("", nrow(fit.coeffs.studies[[1]]) - 1), "\\addlinespace"),
-      col.names = c("QTL study", "Variable", "Mean", "SD", "10th centile", "90th centile"),
+      col.names = c("QTL study", "Variable", "Mean", "10th centile", "90th centile"),
 	  label="posteriorsummaries",
       booktabs=TRUE,
-      longtable=FALSE,
+      longtable=TRUE,
       caption="Posterior summaries and sampling properties of model parameters") %>%
+    add_header_above(c(" "=2, "Posterior distribution"=3)) %>%
   kable_styling(latex_options=c("HOLD_position")) # , "scale_down")) 
 
 ```

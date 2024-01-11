@@ -87,23 +87,29 @@ weighted.median.boot <- function(alpha_hat, gamma_hat, se.alpha_hat, se.gamma_ha
 #' @param X_u Data.table of covariates.
 #' @returns Data.table of coefficients for each genetic instrument
 get_summarystatsforMR <- function(Y, Z, X_u) {
-  require(data.table)
-  YXZ.dt <- data.table(y=Y, Z, X_u)
-  
-  ## loop over instruments to fit regression of Y on Z, adjusted for X_u
-  coeffs <- NULL
-  for(scoreid in colnames(Z)) {
-    formula.string <- paste0("y ~ ",
-                             paste(colnames(X_u), collapse=" + "),
-                             " + ", scoreid)
-    coeff <- summary(glm(data=YXZ.dt, formula=as.formula(formula.string),
-                         family="binomial"))$coefficients
-    coeff <- as.data.table(coeff, keep.rownames="variable")
-    coeff <- coeff[variable==scoreid]
-    coeffs <- rbind(coeffs, coeff)
-  }
-  colnames(coeffs) <- c("scoreid", "beta_YZ", "SE_YZ", "z", "p")
-  return(coeffs)
+    require(data.table)
+    require(foreach)
+    require(doParallel)
+
+    registerDoParallel(cores=10)
+    YXZ.dt <- data.table(y=Y, Z, X_u)
+    ## loop over instruments to fit regression of Y on Z, adjusted for X_u
+    ## FIXME: implement a score test or parallelize
+    coeffs <- foreach(i = 1:ncol(Z),
+                      .combine=function(...) rbind(..., fill = TRUE),
+                      .multicombine = TRUE) %dopar% {
+                          scoreid <- colnames(Z)[i]   
+                          formula.string <- paste0("y ~ ",
+                                                   paste(colnames(X_u), collapse=" + "),
+                                                   " + ", scoreid)
+                          coeff <- summary(glm(data=YXZ.dt,
+                                               formula=as.formula(formula.string),
+                                               family="binomial"))$coefficients
+                          coeff <- as.data.table(coeff, keep.rownames="variable")
+                          coeff <- coeff[variable==scoreid]
+                      }
+    colnames(coeffs) <- c("scoreid", "beta_YZ", "SE_YZ", "z", "p")
+    return(coeffs)
 }
 
 #' calculate conventional MR estimators from summary stats
@@ -161,9 +167,10 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
   ## when fitting a kernel density (usually Sheather-Jones is preferred to default bw)
   ## wider bandwidth gives better approximation to quadratic
   lik <- density(x, bw="SJ", adjust=2, weights=invprior)
-  logl <- log(lik$y)
-  xvals <- lik$x
-  xvals.sq <- lik$x^2
+  nonzero.lik <- which(lik$y > 0)
+  logl <- log(lik$y[nonzero.lik])
+  xvals <- lik$x[nonzero.lik]
+  xvals.sq <- lik$x[nonzero.lik]^2
   ## possible refinement would be to weight the regression that is used to fit the quadratic approximation:
   fit.quad <- lm(logl ~ xvals + xvals.sq)
   a <- -as.numeric(fit.quad$coefficients[3]) # y = -a * x^2 + bx
@@ -218,7 +225,7 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
 #' @param fraction_pleio Prior guess at fraction of instruments that have pleiotropic effects: values between 0.05 and 0.95 are allowed. 
 #' @param priorsd_theta Standard deviation of prior on theta.
 #' @returns An object of class stanfit. 
-run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE, Z, Y, sigma_y=1, X_u, alpha_hat, se.alpha_hat, fraction_pleio=NULL, priorsd_theta=1, vb.algo="meanfield") {
+run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE, Z, Y, sigma_y=1, X_u, alpha_hat, se.alpha_hat, fraction_pleio=NULL, slab_scale=0.25, priorsd_theta=1, vb.algo="meanfield") {
   require(rstan)
 
   options(mc.cores = parallel::detectCores())
@@ -242,8 +249,7 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE, Z, Y, sigma_y=1, X_u, a
   ## priors
   scale_intercept_y <- 10  # weak prior on Y intercept
   scale_beta_u <- 1 # prior sd of coeffs for unpenalized covariates X_u
-  ## prior on c 
-  slab_scale <- 0.25 # small value regularizes largest coeffs 
+  ## prior scale of c is slab_scale
   slab_df <- 2    # 1 for half-Cauchy, large value specifies a gaussian prior on slab component
   nu_global <- 1  # 1 for half-Cauchy prior on global scale param: specifying a larger value will limit the narrowness of the spike component 
   nu_local <- 1    # 1 for half-Cauchy, horseshoe+ or horseshoe if c is large
@@ -315,7 +321,7 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE, Z, Y, sigma_y=1, X_u, a
 #' @param slab_scale scale param of prior on direct effects.
 #' @param priorsd_theta Standard deviation of prior on theta.
 #' @returns An object of class stanfit. 
-run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, fraction_pleio=NULL, slab_scale=0.2, priorsd_theta=1) {
+run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, fraction_pleio=NULL, slab_scale=0.2, slab_df=2, priorsd_theta=1) {
   require(rstan)
   options(mc.cores = parallel::detectCores())
   rstan_options(auto_write = TRUE)
@@ -337,7 +343,7 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
 
   ## priors
   slab_scale <- 0.25 # small value regularizes largest coeffs 
-  slab_df <- 2    # 1 for half-Cauchy, large value specifies a gaussian prior on slab component
+  # slab_df <- 2  # 1 for half-Cauchy, large value specifies a gaussian prior on slab component
   nu_global <- 1  # 1 for half-Cauchy prior on global scale param: specifying a larger value will limit the narrowness of the spike component 
   nu_local <- 1    # 1 for half-Cauchy, horseshoe+ or horseshoe if c is large
 

@@ -47,12 +47,11 @@ transformed parameters {
 
   //  standard t distribution: standard Gaussian scaled by inverse gamma with parameters 0.5 * \nu, 0.5 * \nu.  This is scaled again by scale_global 
   tau = aux1_global * sqrt(aux2_global) * scale_global;  // global scale parameter for pleiotropic effects
-  c = slab_scale * sqrt(caux);
+  c = slab_scale * sqrt(caux); // manuscript uses s_slab for slab_scale, \eta for c
   lambda_tilde = sqrt( c^2 * square(lambda) ./ (c^2 + tau^2 * square(lambda) ));
   beta = z .* lambda_tilde * tau; // scaled vector of pleiotropic effects
 
   for(j in 1:J) {
-    //gamma[j] = beta[j] + theta * alpha_hat[j];
     gamma[j] = beta[j] + theta * alpha[j];
   }
 }
@@ -74,11 +73,11 @@ model {
 
 generated quantities {
   vector[J] kappa; // shrinkage factors for each coefficient
-  real m_eff; // effective number of nonzero coefficients
+  real f; // effective fraction of nonzero coefficients
   real log_c; // log of regularization parameter
   real log_tau; // log of global scale parameter
   kappa = inv_vec(1.0 + lambda_tilde .* lambda_tilde);
-  m_eff = sum(1 - kappa); 
+  f = sum(1 - kappa) / J; 
   log_c = log(c);
   log_tau = log(tau);
 }

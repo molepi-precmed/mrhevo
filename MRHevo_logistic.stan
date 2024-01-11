@@ -89,11 +89,11 @@ model {
 
 generated quantities {
   vector[J] kappa; // shrinkage factors for each coefficient
-  real m_eff; // effective number of nonzero coefficients
+  real f; // effective fraction of nonzero coefficients
   real log_c; // log of regularization parameter
   real log_tau; // log of global scale parameter
   kappa = inv_vec(1.0 + lambda_tilde .* lambda_tilde);
-  m_eff = sum(1 - kappa); 
+  f = sum(1 - kappa) / J; 
   log_c = log(c);
   log_tau = log(tau);
 }
