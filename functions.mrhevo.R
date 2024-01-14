@@ -109,51 +109,53 @@ get_summarystatsforMR <- function(Y, Z, X_u) {
                           coeff <- as.data.table(coeff, keep.rownames="variable")
                           coeff <- coeff[variable==scoreid]
                       }
-    colnames(coeffs) <- c("scoreid", "beta_YZ", "SE_YZ", "z", "p")
+    colnames(coeffs) <- c("scoreid", "gamma_hat", "se.gamma_hat", "z", "p")
     return(coeffs)
+}
+
+get_coeffratios <- function(coeffs.dt, use.delta=FALSE) {
+    if(use.delta) {
+        ## second-order Taylor expansions (delta method)
+        coeffs.dt[, theta_IV := gamma_hat / alpha_hat + se.alpha_hat^2 * gamma_hat / alpha_hat^3]
+        coeffs.dt[, se.theta_IV := sqrt((se.gamma_hat / alpha_hat)^2 +
+                                       gamma_hat^2 * se.alpha_hat^2 / alpha_hat^4)]
+    } else {
+        coeffs.dt[, theta_IV := gamma_hat / alpha_hat]  # ratio estimates
+        coeffs.dt[, se.theta_IV := se.gamma_hat / alpha_hat]
+    }
+    coeffs.dt[, size.theta_IV := 0.3 * sum(se.theta_IV) / se.theta_IV] 
+    coeffs.dt[, inv.var := se.theta_IV^-2]
+    return(coeffs.dt)
 }
 
 #' calculate conventional MR estimators from summary stats
 #'
-#' @param coeffs.dt Data.table with columns for coefficient and SE of regression of exposure on instrument (alpha_hat, se.alpha_hat) and regression of outcome on instrument (gamma_hat, se.gamma_hat).
-#' @param use.delta Logical value for whether to use delta method (second-order Taylor expansion for the expectation and variance of a ratio of two independent Gaussian variables) for the coefficient ratios. The default value is FALSE: this assumes no uncertainty in the denominator.   
+#' @param coeffs.dt Data.table with columns for coefficient and SE of regression of exposure on instrument (alpha_hat, se.alpha_hat), regression of outcome on instrument (gamma_hat, se.gamma_hat) and coefficient ratios (theta_IV, se.theta_IV).
 #' @returns Table of estimates for weighted mean, weighted median, and penalized weighted median of instrumental variable estimates. 
-get_estimatorsMR <- function(coeffs.dt, use.delta=FALSE) {
-    if(use.delta) {
-        ## second-order Taylor expansions (delta method)
-        coeffs.dt[, theta_IV := thetaIV + se.alpha_hat^2 * gamma_hat / alpha_hat^3]
-        coeffs.dt[, se.thetaIV := sqrt((se.gamma_hat / alpha_hat)^2 +
-                                    gamma_hat^2 * se.alpha_hat^2 / alpha_hat^4)]
-    } else {
-        coeffs.dt[, thetaIV := gamma_hat / alpha_hat]  # ratio estimates
-        coeffs.dt[, se.thetaIV := se.gamma_hat / alpha_hat]
-    }
-    coeffs.dt[, size.thetaIV := 0.3 * sum(se.thetaIV) / se.thetaIV] 
-    coeffs.dt[, inv.var := se.thetaIV^-2]
-
+get_estimatorsMR <- function(coeffs.dt) {
     ## IVW estimator
-    thetaIVW <- coeffs.dt[, sum(thetaIV * inv.var) / sum(inv.var)] 
-    se.thetaIVW  <- coeffs.dt[, sqrt(1 / sum(inv.var))]
+    theta_IVW <- coeffs.dt[, sum(theta_IV * inv.var) / sum(inv.var)] 
+    se.theta_IVW  <- coeffs.dt[, sqrt(1 / sum(inv.var))]
     
     ## weighted median estimator
-    thetaWM <- coeffs.dt[, matrixStats::weightedMedian(x=thetaIV, w=inv.var)]
+    thetaWM <- coeffs.dt[, matrixStats::weightedMedian(x=theta_IV, w=inv.var)]
     se.thetaWM <- coeffs.dt[, weighted.median.boot(alpha_hat, gamma_hat, se.alpha_hat, se.gamma_hat, inv.var)]
 
     ## penalized weighted median estimator
     ## penalizes outliers
     ## Bowden J, Davey Smith G, Haycock PC, Burgess S. Consistent Estimation in Mendelian Randomization with Some Invalid Instruments Using a Weighted Median Estimator. Genet Epidemiol. 2016 May;40(4):304-14. doi: 10.1002/gepi.21965. Epub 2016 Apr 7. PMID: 27061298; PMCID: PMC4849733.
-    coeffs.dt[, penalty := pchisq(inv.var * (thetaIV - thetaIVW)^2, df=1, lower.tail=FALSE)]
+    coeffs.dt[, penalty := pchisq(inv.var * (theta_IV - theta_IVW)^2, df=1, lower.tail=FALSE)]
     ## Bowden et al use 20 instead of 20 * .N (equivalent to ignoring penalty where pchisq > .05)
     coeffs.dt[, penalized.weights := inv.var * pmin(1, penalty * 20 *.N)]  # penalized weights
-    thetaPWM <- coeffs.dt[, matrixStats::weightedMedian(x=thetaIV, w=penalized.weights)] 
+    thetaPWM <- coeffs.dt[, matrixStats::weightedMedian(x=theta_IV, w=penalized.weights)] 
     se.thetaPWM <- coeffs.dt[, weighted.median.boot(alpha_hat, gamma_hat,
                                                  se.alpha_hat, se.gamma_hat,
                                                  penalized.weights)]
     
     estimators.dt <- data.table(Estimator=c("Weighted mean", "Weighted median",
                                             "Penalized weighted median"),
-                                Estimate=c(thetaIVW, thetaWM, thetaPWM), 
-                                SE=c(se.thetaIVW, se.thetaWM, se.thetaPWM))
+                                Estimate=c(theta_IVW, thetaWM, thetaPWM), 
+                                SE=c(se.theta_IVW, se.thetaWM, se.thetaPWM))
     estimators.dt[, z := Estimate / SE]
     estimators.dt[, pvalue := 2 * pnorm(-abs(z))]
     estimators.dt[, pvalue.formatted := format.z.aspvalue(z)]
@@ -343,23 +345,21 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
   
   ## check arguments for consistency
   stopifnot(length(alpha_hat)==length(gamma_hat))
-  stopifnot(fraction_pleio >= 0.05 & fraction_pleio <= 0.95)
+  stopifnot(fraction_pleio >= 0.01 & fraction_pleio <= 0.99)
   
   J <- length(alpha_hat)
   
-  var.thetaIV_delta <- (se.gamma_hat / alpha_hat)^2 +
+  var.theta_IV_delta <- (se.gamma_hat / alpha_hat)^2 +
     gamma_hat^2 * se.alpha_hat^2 / alpha_hat^4 # Taylor expansion
-  info <- mean( 1 / var.thetaIV_delta) # mean Fisher info for IV estimate
+  info <- mean( 1 / var.theta_IV_delta) # mean Fisher info for IV estimate
 
-  ## priors
-  slab_scale <- 0.25 # small value regularizes largest coeffs 
-  # slab_df <- 2  # 1 for half-Cauchy, large value specifies a gaussian prior on slab component
+  ## df of half-t priors
   nu_global <- 1  # 1 for half-Cauchy prior on global scale param: specifying a larger value will limit the narrowness of the spike component 
   nu_local <- 1    # 1 for half-Cauchy, horseshoe+ or horseshoe if c is large
 
 
   ## prior median of a half-t distribution with nu_global df
-  tau0 <- set.tau0(fraction_pleio=fraction_pleio, nu_global=1, J=J,
+  tau0 <- set.tau0(fraction_pleio=fraction_pleio, nu_global=nu_global, J=J,
                    info=info)
 
   ## choose prior on tau so that most of the prior mass is near tau_0
@@ -392,6 +392,56 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
   return(fit.mc)
 }
 
+#' run Stan model for Mendelian randomization with regularized horsehoe prior on pleiotropic effects, using summary statistics only. 
+#' @param alpha_hat Vector of estimated coefficients for effect of instruments on exposure.  
+#' @param se.alpha_hat Vector of standard errors for coefficients alpha_hat.
+#' @param gamma_hat Vector of estimated coefficients for effect of instruments on outcome.  
+#' @param se.gamma_hat Vector of standard errors for coefficients gamma_hat.
+#' @param fraction_pleio Prior guess at fraction of instruments that have pleiotropic effects: values between 0.05 and 0.95 are allowed. 
+#' @param slab_scale scale param of prior on direct effects.
+#' @param priorsd_theta Standard deviation of prior on theta.
+#' @returns An object of class stanfit. 
+run_mrhevo.fixedtau <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, tau=1E-6, slab_scale=0.2, slab_df=2, priorsd_theta=1) {
+  require(rstan)
+  options(mc.cores = parallel::detectCores())
+  rstan_options(auto_write = TRUE)
+
+  ## check arguments for consistency
+  stopifnot(length(alpha_hat)==length(gamma_hat))
+  
+  cat("compiling stan model ... ")
+  mr.fixedtau.stanmodel <- stan_model(file="../mrhevo/MRHevo_fixedtau.stan",
+                                    model_name="MRHevo.fixedtau", verbose=FALSE)
+  cat("done\n")
+  
+  J <- length(alpha_hat)
+  
+  ## priors
+  nu_local <- 1    # 1 for half-Cauchy, horseshoe+ or horseshoe if c is large
+
+  data.stan <- list(J=length(alpha_hat), 
+                    gamma_hat=gamma_hat,
+                    sd_gamma_hat=se.gamma_hat,
+                    alpha_hat=alpha_hat,
+                    sd_alpha_hat=se.alpha_hat,
+                    tau=tau, 
+                    nu_local=nu_local,
+                    priorsd_theta=priorsd_theta,
+                    slab_scale=slab_scale,
+                    slab_df=slab_df, priorsd_theta=priorsd_theta)
+
+  cat("Sampling posterior distribution ... ")
+  fit.mc <- rstan::sampling(object=mr.fixedtau.stanmodel,
+                            data=data.stan,
+                            iter=3000, warmup=1000,
+                            cores=4,
+                            chains=4,
+                            refresh=1000,
+                            control=list(adapt_delta=0.99),
+                            verbose=TRUE)
+  cat("done\n")
+  return(fit.mc)
+}
 
 #' get value tau0 for global shrinkage parameter tau given expectation of fraction_pleio
 #' @param fraction_pleio Prior guess at fraction of effects that are nonzero.  
