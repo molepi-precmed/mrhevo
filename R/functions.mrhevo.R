@@ -172,6 +172,7 @@ get_estimatorsMR <- function(coeffs.dt) {
 #' @param prior Numeric vector of values of the prior density for each element of x.
 #' @param return.asplot Logical value determines whether the function returns maximum likelihood estimate or a plot of the posterior density and log-likelihood.
 #' @returns If return.asplot is FALSE, data.table with one row containing maximum likelihood estimate, standard error, test statistic, p-value, formatted p-value.
+#' @import cowplot
 mle.se.pval <- function(x, prior, return.asplot=FALSE) {
   require(data.table)
   require(ggplot2)
@@ -245,7 +246,7 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
 #'
 #' @example man/examples/runmrhevo.R
 #' @export
-#' @import data.table rstan ggplot2
+#' @import data.table rstan ggplot2 bayesplot
 run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE, Z, Y, sigma_y=1, X_u, alpha_hat, se.alpha_hat, fraction_pleio=NULL, slab_scale=0.25, priorsd_theta=1, vb.algo="meanfield") {
   require(rstan)
 

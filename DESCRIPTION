@@ -30,6 +30,8 @@ Imports:
     crayon,
     data.table,
     rstan,
+    bayesplot,
+    cowplot,
     ggrepel,
     ggplotify
 Suggests:

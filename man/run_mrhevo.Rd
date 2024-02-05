@@ -101,10 +101,13 @@ num.maxtreedepth <- get_num_max_treedepth(hevo.stanfit)
 
 ## pairs plot of posterior samples
 p.pairs <- ggplotify::as.ggplot(function() {
-    pairs(hevo.stanfit,
+    mcmc_pairs(posterior_cp, pars=c("theta", "log_c", "log_tau", "f", "lp__"),
+               off_diag_args=list(size = 0.75))
+    pairs(posterior_cp,
           pars=c("theta", "log_c", "log_tau", "f", "lp__"))
+    # pairs(hevo.stanfit,
+#           pars=c("theta", "log_c", "log_tau", "f", "lp__"))
 })
-p.pairs
 
 ## trace plot of posterior samples
 p.traceplot <-  traceplot(hevo.stanfit,

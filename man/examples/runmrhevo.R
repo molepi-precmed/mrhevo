@@ -12,6 +12,8 @@ library(data.table)
 library(rstan)
 library(ggrepel)
 library(ggplotify)
+library(bayesplot)
+library(cowplot)
 
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
@@ -59,11 +61,9 @@ num.divergent <- get_num_divergent(hevo.stanfit)
 num.maxtreedepth <- get_num_max_treedepth(hevo.stanfit)
 
 ## pairs plot of posterior samples
-p.pairs <- ggplotify::as.ggplot(function() {
-    pairs(hevo.stanfit,
-          pars=c("theta", "log_c", "log_tau", "f", "lp__"))
-})
-p.pairs
+p.pairs <- mcmc_pairs(posterior_cp,
+                      pars=c("theta", "log_c", "log_tau", "f", "lp__"),
+                      off_diag_args=list(size = 0.75))
 
 ## trace plot of posterior samples
 p.traceplot <-  traceplot(hevo.stanfit,
