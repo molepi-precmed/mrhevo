@@ -333,7 +333,7 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE, Z, Y, sigma_y=1, X_u, a
 #' @param slab_scale scale param of prior on direct effects.
 #' @param priorsd_theta Standard deviation of prior on theta.
 #' @returns An object of class stanfit. 
-run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, fraction_pleio=NULL, slab_scale=0.2, slab_df=2, priorsd_theta=1) {
+run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, fraction_pleio=0.5, slab_scale=0.2, slab_df=2, priorsd_theta=1) {
   require(rstan)
   options(mc.cores = parallel::detectCores())
   rstan_options(auto_write = TRUE)

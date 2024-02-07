@@ -22,7 +22,7 @@ rstan_options(auto_write = TRUE)
 ## dataset should have columns named qtlname, alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat
 ## other columns are optional
 coeffs.dt <- readRDS("./coeffs_ADIPOQ_UKBB.RDS")
-coeffs.dt <- readRDS("../mrhevo/coeffs_CLC_asthma_UKBB.RDS")
+#coeffs.dt <- readRDS("../mrhevo/coeffs_CLC_asthma_UKBB.RDS")
 #coeffs.dt <- coeffs.dt[minpvalue < 1E-8]
 ## calculate coefficient ratios for each instrument
 coeffs.dt <- get_coeffratios(coeffs.dt, use.delta=TRUE)
@@ -129,4 +129,42 @@ p.coeffs <- ggplot(coeffs.dt,
     ylab(paste("Effect on outcome"))
 options(warn=1)
 p.coeffs
+options(warn=2)
+
+pars.fitted <- c("alpha", "beta", "theta")
+
+fitted.coeffs <- extract(hevo.stanfit, pars=pars.fitted) 
+
+fitted.coeffs[[1]] <- as.data.table(fitted.coeffs[[1]])
+colnames(fitted.coeffs[[1]]) <- coeffs.dt$qtlname
+fitted.coeffs[[1]][, iteration := .I]
+fitted.coeffs[[1]] <- melt(fitted.coeffs[[1]], id.vars="iteration",
+                           variable.name="qtlname", value.name="alpha")
+
+fitted.coeffs[[2]] <- as.data.table(fitted.coeffs[[2]])
+colnames(fitted.coeffs[[2]]) <- coeffs.dt$qtlname
+fitted.coeffs[[2]][, iteration := .I]
+fitted.coeffs[[2]] <- melt(fitted.coeffs[[2]], id.vars="iteration",
+                           variable.name="qtlname", value.name="beta")
+
+fitted.coeffs[[3]] <- as.numeric(fitted.coeffs[[3]])
+
+fitted.coeffs <- data.table(fitted.coeffs[[1]],
+                            fitted.coeffs[[2]][, .(beta)],
+                            theta=as.numeric(fitted.coeffs[[3]])
+                            )
+fitted.coeffs[, gamma := beta + theta * alpha]
+fitted.coeffs <- fitted.coeffs[, .(alpha=mean(alpha), gamma=mean(gamma)),
+                               by=qtlname]                            
+
+options(warn=1)
+ggplot(fitted.coeffs, aes(x=alpha, y=gamma)) + 
+    geom_point() +
+    ggrepel::geom_text_repel(aes(label=qtlname), force=5, size=2.5, fontface="italic", color="blue") + 
+    geom_abline(slope=mle.theta$Estimate, intercept=0) +
+    scale_x_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) + 
+    scale_y_continuous(limits = c(min(c(fitted.coeffs$gamma, 0)),
+                                  max(c(fitted.coeffs$gamma, 0))),
+                       expand =  expansion(mult = c(0.1, 0.1)))  
+
 options(warn=2)
