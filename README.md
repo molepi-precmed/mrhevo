@@ -1,22 +1,40 @@
 # MR-Hevo -- Inference of causal effects by Mendelian randomization, marginalizing over distribution of pleiotropic effects
-Mendelian randomization has been widely used to study causal effects of exposures (broadly defined to include behavioural traits, biomarkers and gene expression levels) on diseases.  The biggest methodological challenge is how to infer causality when some of the genetic instruments have direct (pleiotropic) effects on the outcome that are not mediated through the exposure under study.  These pleiotropic effects are not directly observed, and their distribution over the instruments is unknown. 
+Mendelian randomization has been widely used to study causal effects of exposures (broadly defined to include behavioural traits, biomarkers and gene expression levels) on diseases.  The biggest methodological challenge is how to infer causality when some of the genetic instruments have direct (pleiotropic) effects on the outcome that are not mediated through the exposure under study.  These pleiotropic effects are not directly observed, and their distribution over the instruments is unknown.
 
-Inference of causal effects can be tackled like any other statistical problem, by computing the likelihood (or posterior distribution) of the parameter of interest (the causal effect) while marginalizing over the distribution of nuisance variables (in this case the pleiotropic effects).  If we can compute the posterior distribution of the parameter of interest, we can obtain the likelihood by dividing by the prior on that parameter.  
+Inference of causal effects can be tackled like any other statistical problem, by computing the likelihood (or posterior distribution) of the parameter of interest (the causal effect) while marginalizing over the distribution of nuisance variables (in this case the pleiotropic effects).  If we can compute the posterior distribution of the parameter of interest, we can obtain the likelihood by dividing by the prior on that parameter.
 
 As the form of the distribution of pleiotropic effects over loci is unknown, any realistic statistical model has to specify a prior that encompassses a broad family of symmetric distributions ranging from a spike-and-slab to a Gaussian.  An initial implementation of this approach has been been described by [Berzuini et al (2020)](https://doi.org/10.1093/biostatistics/kxy027).  They specify a horseshoe prior for the pleiotropic effects, and generate the posterior distribution of all model parameters, including the causal effect parameter, by Markov chain Monte Carlo sampling.  An implementation that uses only summary statistics has been described by [Grant and Burgess (2020)](https://www.biorxiv.org/content/10.1101/2023.05.30.542988v1)
 
-This method extends the likelihood-based approach 
+This method extends the likelihood-based approach
 
-1. to two-step Mendelian randomization, where step 1 uses only summary statistics for the effects of genetic instruments on exposure, and step 2 uses individual-level data to test the effects of these instruments on the outcome. 
+1. to two-step Mendelian randomization, where step 1 uses only summary statistics for the effects of genetic instruments on exposure, and step 2 uses individual-level data to test the effects of these instruments on the outcome.
 
-2. to use a regularized horseshoe prior on shrinkage coefficients, as described by [Piironen and Vehtari (2017)](https://doi.org/10.1214/17-EJS1337SI).  This prior, known as the "Finnish horseshoe", has better computational properties than the original horseshoe.  On this basis, the method is named `MR-Hevo` (hevo is Finnish for a horse). 
+2. to use a regularized horseshoe prior on shrinkage coefficients, as described by [Piironen and Vehtari (2017)](https://doi.org/10.1214/17-EJS1337SI).  This prior, known as the "Finnish horseshoe", has better computational properties than the original horseshoe.  On this basis, the method is named `MR-Hevo` (hevo is Finnish for a horse).
 
-3. to generate classical maximum likelihood estimates and _p_-values for the causal effect. 
+3. to generate classical maximum likelihood estimates and _p_-values for the causal effect.
 
 
-The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are clumps of SNPs with trans- effects on the expression of a gene as transcript or circulating protein.  
+The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are clumps of SNPs with trans- effects on the expression of a gene as transcript or circulating protein.
 
 A description of the statistical model is [here](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf) and a vignette is [here](https://htmlpreview.github.io/?https://github.com/molepi-precmed/mrhevo/blob/main/vignette.html)
 
-This is work in progress.  We shall upload further examples and eventually an R package. 
+This is work in progress.  We shall upload further examples and eventually an R package.
 
+## Troubleshooting
+
+Here we have listed some common errors that you may experience when you run the package. Please note this list is not exhaustive.
+
+1. `error in sink(type = "output") : invalid connection`
+
+This is a Stan error and the following steps can help fix (depending on your platform).
+
+* The `/tmp` directory is not read-write on most Linux servers, thus it is recommended to create a temporary directory in user's home directory (e.g. `/home/$USER/tmp`) and point R to it by creating `~/.Renviron` file with the following content:
+
+    `TMPDIR=/home/<username>/tmp`
+
+    `TMP=/home/<username>/tmp`
+
+    `TEMP=/home/<username>/tmp`
+
+
+* Make sure you use the correct `C++` compiler. It is generally advised to use system-default compilers. If you need to define a custom compiler, this can usually be done by updating the `~/.R/Makevars` file with custom specifications.
