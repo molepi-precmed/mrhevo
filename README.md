@@ -18,23 +18,29 @@ The motivation for this work was to develop a method to test formally for causal
 
 A description of the statistical model is [here](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf) and a vignette is [here](https://htmlpreview.github.io/?https://github.com/molepi-precmed/mrhevo/blob/main/vignette.html)
 
-This is work in progress.  We shall upload further examples and eventually an R package.
+## Installation
 
 ## Troubleshooting
 
-Here we have listed some common errors that you may experience when you run the package. Please note this list is not exhaustive.
+This package is in early beta testing and things can go wrong! Proceed with caution.
 
-1. `error in sink(type = "output") : invalid connection`
+Here we have listed some common errors that you may experience when installing or using the package. Please note this list is not exhaustive.
 
-This is a Stan error and the following steps can help fix (depending on your platform).
+### System tmp directory is not writable
 
-* The `/tmp` directory is not read-write on most Linux servers, thus it is recommended to create a temporary directory in user's home directory (e.g. `/home/$USER/tmp`) and point R to it by creating `~/.Renviron` file with the following content:
+ `error in sink(type = "output") : invalid connection`
 
-    `TMPDIR=/home/<username>/tmp`
+This is a Stan error related to system `/tmp` directory being not writable. This is a common case on HPC systems and linux servers.
 
-    `TMP=/home/<username>/tmp`
+* It is recommended to create a temporary directory in user's home directory (e.g. `/home/$USER/tmp`) and point R to it by creating `~/.Renviron` file with the following content:
 
-    `TEMP=/home/<username>/tmp`
+    ```sh
+    TMPDIR=/home/<username>/tmp
+    TMP=/home/<username>/tmp
+    TEMP=/home/<username>/tmp
+  ````
 
+### Stan cannot compile the model
 
-* Make sure you use the correct `C++` compiler. It is generally advised to use system-default compilers. If you need to define a custom compiler, this can usually be done by updating the `~/.R/Makevars` file with custom specifications.
+* Rare Stan errors related to C compiler were also reported by users. This package was tested on Ubuntu 20.04 with `gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.2)` and R4.3. This package was not tested on MacOS or Windows. In case of any errors related to compilation of Stan models refer to Stan and Rstan documentation, help and troubleshooting guides.
+* We noted that specifying custom C++ compilers and flags in `Makevars` often leads to errors, hence, refer to Stan and Rstan documentation if you need to use custom compilers and proceed with caution.
