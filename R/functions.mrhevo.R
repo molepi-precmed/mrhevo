@@ -1,3 +1,30 @@
+#' Report a message to the terminal
+#'
+#' @param mode One of \sQuote{info} (normal messages), \sQuote{note} (messages
+#'        that require some highlighting), \sQuote{warn} (important information
+#'        the user should definitely notice).
+#' @param ... Strings to be reported.
+#' @param LF Whether a newline character should be added at the end of the
+#'        message (\code{TRUE} by default).
+#'
+#' @import crayon
+#' @export
+msg <- function(mode, ..., LF=TRUE) {
+    message(mode(...), appendLF=LF)
+}
+info <- crayon::reset
+note <- crayon::green
+warn <- crayon::yellow
+bold <- crayon::bold
+
+#' Output a consisted header message.
+#'
+#' @param message Message to output.
+#'
+#' @export
+header <- function(message) {
+    msg(bold, note("\n#"), message)
+}
 
 #' return upper bound on p-value  where z is so extreme that pnorm(-z) returns zero
 #'
@@ -137,6 +164,7 @@ get_coeffratios <- function(coeffs.dt, use.delta=FALSE) {
 #'
 #' @param coeffs.dt Data.table with columns for coefficient and SE of regression of exposure on instrument (alpha_hat, se.alpha_hat), regression of outcome on instrument (gamma_hat, se.gamma_hat) and coefficient ratios (theta_IV, se.theta_IV).
 #' @returns Table of estimates for weighted mean, weighted median, and penalized weighted median of instrumental variable estimates.
+#' @export
 get_estimatorsMR <- function(coeffs.dt) {
     ## IVW estimator
     theta_IVW <- coeffs.dt[, sum(theta_IV * inv.var) / sum(inv.var)]
@@ -173,6 +201,7 @@ get_estimatorsMR <- function(coeffs.dt) {
 #' @param return.asplot Logical value determines whether the function returns maximum likelihood estimate or a plot of the posterior density and log-likelihood.
 #' @returns If return.asplot is FALSE, data.table with one row containing maximum likelihood estimate, standard error, test statistic, p-value, formatted p-value.
 #' @import cowplot
+#' @export
 mle.se.pval <- function(x, prior, return.asplot=FALSE) {
   require(data.table)
   require(ggplot2)
@@ -253,10 +282,10 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE, Z, Y, sigma_y=1, X_u, a
   options(mc.cores = parallel::detectCores())
   rstan_options(auto_write = TRUE)
 
-  cat("compiling stan model ... ")
+  msg(bold, "Compiling stan model ... ")
   mr.stanmodel <- stan_model(file="../mrhevo/MRHevo_logistic.stan",
                              model_name="MRHevo.logistic", verbose=FALSE)
-  cat("done\n")
+  msg(note, "Done.\n")
 
   ## check arguments for consistency
   stopifnot(length(unique(c(nrow(Z), nrow(X_u), length(Y)))) == 1)
@@ -357,10 +386,10 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
   options(mc.cores = parallel::detectCores())
   rstan_options(auto_write = TRUE)
 
-  cat("compiling stan model ... ")
+  msg(bold, "Compiling stan model ... ")
   mr.sstats.stanmodel <- stan_model(file="../mrhevo/MRHevo_summarystats.stan",
                                     model_name="MRHevo.summarystats", verbose=FALSE)
-  cat("done\n")
+  msg(note, "Done.\n")
 
   ## check arguments for consistency
   stopifnot(length(alpha_hat)==length(gamma_hat))
@@ -397,8 +426,7 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
                     priorsd_theta=priorsd_theta,
                     slab_scale=slab_scale,
                     slab_df=slab_df, priorsd_theta=priorsd_theta)
-
-  cat("Sampling posterior distribution ... ")
+  msg(bold, "Sampling posterior distribution ... ")
   fit.mc <- rstan::sampling(object=mr.sstats.stanmodel,
                             data=data.stan,
                             iter=3000, warmup=1000,
@@ -407,7 +435,7 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
                             refresh=1000,
                             control=list(adapt_delta=0.99),
                             verbose=TRUE)
-  cat("done\n")
+  msg(note, "Done.\n")
   return(fit.mc)
 }
 
@@ -429,10 +457,10 @@ run_mrhevo.fixedtau <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat
   ## check arguments for consistency
   stopifnot(length(alpha_hat)==length(gamma_hat))
 
-  cat("compiling stan model ... ")
+  msg(bold, "Compiling stan model ... ")
   mr.fixedtau.stanmodel <- stan_model(file="../mrhevo/MRHevo_fixedtau.stan",
                                     model_name="MRHevo.fixedtau", verbose=FALSE)
-  cat("done\n")
+  msg(note, "Done.\n")
 
   J <- length(alpha_hat)
 
@@ -450,7 +478,7 @@ run_mrhevo.fixedtau <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat
                     slab_scale=slab_scale,
                     slab_df=slab_df, priorsd_theta=priorsd_theta)
 
-  cat("Sampling posterior distribution ... ")
+  msg(bold, "Sampling posterior distribution ... ")
   fit.mc <- rstan::sampling(object=mr.fixedtau.stanmodel,
                             data=data.stan,
                             iter=3000, warmup=1000,
@@ -459,7 +487,7 @@ run_mrhevo.fixedtau <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat
                             refresh=1000,
                             control=list(adapt_delta=0.99),
                             verbose=TRUE)
-  cat("done\n")
+  msg(note, "Done.\n")
   return(fit.mc)
 }
 

@@ -1,13 +1,11 @@
-
-## this script runs a complete MRHevo analysis of the exemplar dataset coeffs.dt, with various tables and plots reporting the results
-
-## the functions are in ./functions.mrhevo.R with documentation in correct format for R package
-## I suggest making a package so that running the Stan model creates a a class mrhevo.stanfit.
-## This should contain the stanfit object hevo.stanfit and the data.table object coeffs.dt
-
-## all the chunks of code called to generate tables and plots should be methods for this object
-## sampler diagnostics, pairs plot, trace plot, max likelihood estimate, plot posterior density, posterior summaries, plot shrinkage coefficients, plot coeffs
-
+#' Example of a complete MRHevo analysis of the exemplar dataset coeffs.dt,
+#' with various tables and plots reporting the results. The example results will
+#' be saved in mrhevo_example subdirectory of the current working directory.
+#'
+#' The package is loaded with the example dataset containing required columns:
+#' qtlname, alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat. Other columns are
+#' optional.
+## -----------------------------------------------------------------------------
 library(data.table)
 library(rstan)
 library(ggrepel)
@@ -15,23 +13,19 @@ library(ggplotify)
 library(bayesplot)
 library(cowplot)
 
+info <- crayon::reset
+note <- crayon::green
+warn <- crayon::yellow
+bold <- crayon::bold
+
+header("Running mrhevo example script.")
+
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 
-## exemplar dataset to be included in package
-## dataset should have columns named qtlname, alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat
-## other columns are optional
-<<<<<<< ours:runmrhevo.R
-coeffs.dt <- readRDS("./coeffs_ADIPOQ_UKBB.RDS")
-#coeffs.dt <- readRDS("../mrhevo/coeffs_CLC_asthma_UKBB.RDS")
-||||||| ancestor
-coeffs.dt <- readRDS("./coeffs_ADIPOQ_UKBB.RDS")
-coeffs.dt <- readRDS("../mrhevo/coeffs_CLC_asthma_UKBB.RDS")
-=======
-# coeffs.dt <- readRDS("./coeffs_ADIPOQ_UKBB.RDS")
-# coeffs.dt <- readRDS("../mrhevo/coeffs_CLC_asthma_UKBB.RDS")
->>>>>>> theirs:man/examples/runmrhevo.R
-#coeffs.dt <- coeffs.dt[minpvalue < 1E-8]
+example.dir <- file.path(getwd(), "mrhevo_example")
+dir.create(example.dir, showWarnings=FALSE)
+
 ## calculate coefficient ratios for each instrument
 coeffs.dt <- get_coeffratios(coeffs.dt, use.delta=TRUE)
 
@@ -40,13 +34,13 @@ slab_scale <- 0.05
 slab_df <- 2
 fraction_pleio <- 0.2
 
-priorsd_theta <- 1  # prior doesn't matter as we will divide posterior by it to get likelihood
+## prior doesn't matter as we will divide posterior by it to get likelihood
+priorsd_theta <- 1
 
 ## run Bayesian analysis to generate object of class stanfit
 options(warn=1)
 hevo.stanfit <-
     run_mrhevo.sstats(fraction_pleio=fraction_pleio,
-   # run_mrhevo.fixedtau(tau=1E-6,
                       alpha_hat=coeffs.dt$alpha_hat,
                       se.alpha_hat=coeffs.dt$se.alpha_hat,
                       gamma_hat=coeffs.dt$gamma_hat,
@@ -56,30 +50,36 @@ hevo.stanfit <-
                       priorsd_theta=1)
 options(warn=2)
 
-## sampler diagnostics
+## get sampler diagnostics
 num.divergent <- get_num_divergent(hevo.stanfit)
 num.maxtreedepth <- get_num_max_treedepth(hevo.stanfit)
 
-## pairs plot of posterior samples
-p.pairs <- mcmc_pairs(posterior_cp,
+## create and save pairs plot of posterior samples
+p.pairs <- mcmc_pairs(hevo.stanfit,
                       pars=c("theta", "log_c", "log_tau", "f", "lp__"),
                       off_diag_args=list(size = 0.75))
+ggsave(file.path(example.dir, "pairsplot.png"), p.pairs)
 
-## trace plot of posterior samples
+## create and save trace plot of posterior samples
 p.traceplot <-  traceplot(hevo.stanfit,
                           pars=c("theta", "log_c", "log_tau", "f", "lp__"),
                           inc_warmup=FALSE)
+ggsave(file.path(example.dir, "traceplot.png"), p.traceplot)
 
-## maximum likelihood estimate of theta from posterior density
+## get maximum likelihood estimate of theta from posterior density
 theta.samples <-  unlist(extract(hevo.stanfit, pars="theta"))
 prior.theta <- dnorm(theta.samples, mean=0, sd=priorsd_theta)
+options(warn=1)
 mle.theta <- mle.se.pval(x=theta.samples, prior=prior.theta)
+options(warn=2)
 mle.theta[, Estimator := "Marginalize over direct effects"]
 
 ## plot posterior and log-likelihood
 options(warn=1)
-p.bayesian.loglik <-  mle.se.pval(x=theta.samples, prior=prior.theta, return.asplot=TRUE)
+p.bayesian.loglik <- mle.se.pval(x=theta.samples, prior=prior.theta,
+                                 return.asplot=TRUE)
 options(warn=2)
+ggsave(file.path(example.dir, "posterior_loglik.png"), p.bayesian.loglik)
 
 ## tabulate posterior summaries for global parameters
 pars.forsummary <- c("theta", "log_c", "log_tau", "f", "lp__", "beta", "kappa")
@@ -95,22 +95,24 @@ qtlnames <- coeffs.dt$qtlname
 fit.coeffs[grep("beta\\[", variable), qtlname := ..qtlnames]
 fit.coeffs[grep("kappa\\[", variable), qtlname := ..qtlnames]
 fit.coeffs[qtlname=="", qtlname := variable]
-fit.coeffs
+
+msg(info, "Table of the posterior summaries for parameters.\n")
+print(fit.coeffs)
 
 ## plot shrinkage coefficients
 p.shrinkage <- ggplot(data=fit.coeffs[grep("kappa", variable)],
                       aes(y=qtlname, x=mean, xmin=`10%`, xmax=`90%`)) +
     geom_pointrange()
-p.shrinkage
+ggsave(file.path(example.dir, "shrinkageplot.png"), p.shrinkage)
 
 p.beta <- ggplot(data=fit.coeffs[grep("beta", variable)],
                       aes(y=qtlname, x=mean, xmin=`10%`, xmax=`90%`)) +
     geom_pointrange() +
     geom_vline(xintercept=0, linetype="dotted")
-p.beta
+ggsave(file.path(example.dir, "betaplot.png"), p.beta)
 
-## get MR "estimators": weighted mean, weighted median, penalized weighted median
-## append MRHevo estimate
+## get MR "estimators": weighted mean, weighted median,
+## penalized weighted median and append MRHevo estimate
 estimators <- get_estimatorsMR(coeffs.dt)
 estimators <- rbind(estimators, mle.theta, fill=TRUE)
 
@@ -134,43 +136,8 @@ p.coeffs <- ggplot(coeffs.dt,
     xlab(paste("Effect of genetic instrument on exposure")) +
     ylab(paste("Effect on outcome"))
 options(warn=1)
-p.coeffs
-options(warn=2)
+ggsave(file.path(example.dir, "coeffsplots.png"), p.coeffs)
 
-pars.fitted <- c("alpha", "beta", "theta")
-
-fitted.coeffs <- extract(hevo.stanfit, pars=pars.fitted) 
-
-fitted.coeffs[[1]] <- as.data.table(fitted.coeffs[[1]])
-colnames(fitted.coeffs[[1]]) <- coeffs.dt$qtlname
-fitted.coeffs[[1]][, iteration := .I]
-fitted.coeffs[[1]] <- melt(fitted.coeffs[[1]], id.vars="iteration",
-                           variable.name="qtlname", value.name="alpha")
-
-fitted.coeffs[[2]] <- as.data.table(fitted.coeffs[[2]])
-colnames(fitted.coeffs[[2]]) <- coeffs.dt$qtlname
-fitted.coeffs[[2]][, iteration := .I]
-fitted.coeffs[[2]] <- melt(fitted.coeffs[[2]], id.vars="iteration",
-                           variable.name="qtlname", value.name="beta")
-
-fitted.coeffs[[3]] <- as.numeric(fitted.coeffs[[3]])
-
-fitted.coeffs <- data.table(fitted.coeffs[[1]],
-                            fitted.coeffs[[2]][, .(beta)],
-                            theta=as.numeric(fitted.coeffs[[3]])
-                            )
-fitted.coeffs[, gamma := beta + theta * alpha]
-fitted.coeffs <- fitted.coeffs[, .(alpha=mean(alpha), gamma=mean(gamma)),
-                               by=qtlname]                            
-
-options(warn=1)
-ggplot(fitted.coeffs, aes(x=alpha, y=gamma)) + 
-    geom_point() +
-    ggrepel::geom_text_repel(aes(label=qtlname), force=5, size=2.5, fontface="italic", color="blue") + 
-    geom_abline(slope=mle.theta$Estimate, intercept=0) +
-    scale_x_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) + 
-    scale_y_continuous(limits = c(min(c(fitted.coeffs$gamma, 0)),
-                                  max(c(fitted.coeffs$gamma, 0))),
-                       expand =  expansion(mult = c(0.1, 0.1)))  
-
-options(warn=2)
+note.msg <- sprintf("Example script has finished.\n Results were written to %s",
+                    example.dir)
+msg(note, note.msg)
