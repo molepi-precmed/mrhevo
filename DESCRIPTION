@@ -1,0 +1,41 @@
+Package: mrhevo
+Type: Package
+Title: Inference of causal effects by Mendelian randomisation, marginalising over distribution of direct effects
+Version: 0.0.0.1
+Date: 2023-02-04
+Author: Paul McKeigue, Andrii Iakovliev, Buddhi Erabadda and Athina Spiliopoulou
+Maintainer: Andrii Iakovliev <a.iakovliev@icloud.com>
+Authors@R: c(person("Paul", "McKeigue",
+                    email="paul.mckeigue@ed.ac.uk", role=c("aut", "cre"),
+                    comment=c(ORCID="0000-0002-5217-1034")),
+             person("Andrii", "Iakovliev",
+                    email="andrii.iakovliev@ed.ac.uk", role=c("aut", "cre"),
+                    comment=c(ORCID="0000-0003-4031-0073")),
+             person("Buddhi", "Erabadda",
+                    email="b.erabadda@ed.ac.uk", role="aut",
+                    comment=c(ORCID="0000-0003-4401-7149")),
+             person("Athina", "Spiliopoulou",
+                    email="A.Spiliopoulou@ed.ac.uk", role="aut",
+                    comment=c(ORCID="0000-0002-5929-6585")))
+Description: Inference of causal effects by Mendelian randomization, 
+             marginalizing over distribution of direct effects.
+License: GPL-3
+URL: https://github.com/molepi-precmed/mrhevo
+LazyLoad: yes
+LazyData: true
+Depends:
+    R (>= 4.0)
+Imports:
+    bigmemory,
+    crayon,
+    data.table,
+    rstan,
+    ggrepel,
+    ggplotify
+Suggests:
+    testthat (>= 3.0)
+LinkingTo: Rcpp, BH, bigmemory, RcppEigen
+ByteCompile: TRUE
+Encoding: UTF-8
+RoxygenNote: 7.2.3
+Config/testthat/edition: 3
