@@ -16,7 +16,10 @@ This method extends the likelihood-based approach
 
 The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are clumps of SNPs with trans- effects on the expression of a gene as transcript or circulating protein.
 
-A description of the statistical model is [here](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf) and a vignette is [here](https://htmlpreview.github.io/?https://github.com/molepi-precmed/mrhevo/blob/main/vignette.html)
+## Guide
+
+- A description of the statistical model is available on [theory page](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf)
+- Also refer to the package [vignette](https://htmlpreview.github.io/?https://github.com/molepi-precmed/mrhevo/blob/main/vignette.html)
 
 ## Installation
 
@@ -51,9 +54,13 @@ This is a Stan error related to system `/tmp` directory being not writable. This
     TMPDIR=/home/<username>/tmp
     TMP=/home/<username>/tmp
     TEMP=/home/<username>/tmp
-  ````
+  ```
 
 ### Stan cannot compile the model
 
 * Rare Stan errors related to C compiler were also reported by users. This package was tested on Ubuntu 20.04 with `gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.2)` and R4.3. This package was not tested on MacOS or Windows. In case of any errors related to compilation of Stan models refer to Stan and Rstan documentation, help and troubleshooting guides.
 * We noted that specifying custom C++ compilers and flags in `Makevars` often leads to errors, hence, refer to Stan and Rstan documentation if you need to use custom compilers and proceed with caution.
+
+# Copyright
+
+This code was developed by [Paul McKeigue](https://precmed.cphs.mvm.ed.ac.uk/pmckeigue), [Andrii Iakovliev](https://whimsial.github.io), [Buddhiprabha Erabadda](https://www.linkedin.com/in/buddhiprabha/) and [Athina Spiliopoulou](https://precmed.cphs.mvm.ed.ac.uk/athina/) and licensed under [GPL-3 license](https://www.gnu.org/licenses/gpl-3.0.txt).
