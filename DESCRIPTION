@@ -26,12 +26,16 @@ LazyData: true
 Depends:
     R (>= 4.0)
 Imports:
-    bigmemory,
+    utils,
+    foreach,
+    doParallel,
     crayon,
     data.table,
+    matrixStats,
     rstan,
     bayesplot,
     cowplot,
+    car,
     ggrepel,
     ggplotify
 Suggests:

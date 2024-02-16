@@ -2,7 +2,7 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{format.scinot.pvalue}
 \alias{format.scinot.pvalue}
-\title{reformat for LaTeX p-values that are in scientific notation}
+\title{Reformat p-values that are in scientific notation for LaTeX.}
 \usage{
 \method{format}{scinot.pvalue}(x)
 }
@@ -13,5 +13,5 @@
 A character vector of LaTeX math expressions.
 }
 \description{
-reformat for LaTeX p-values that are in scientific notation
+Reformat p-values that are in scientific notation for LaTeX.
 }

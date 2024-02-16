@@ -2,16 +2,30 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{get_estimatorsMR}
 \alias{get_estimatorsMR}
-\title{calculate conventional MR estimators from summary stats}
+\title{Calculate conventional MR estimators from summary stats.}
 \usage{
 get_estimatorsMR(coeffs.dt)
 }
 \arguments{
-\item{coeffs.dt}{Data.table with columns for coefficient and SE of regression of exposure on instrument (alpha_hat, se.alpha_hat), regression of outcome on instrument (gamma_hat, se.gamma_hat) and coefficient ratios (theta_IV, se.theta_IV).}
+\item{coeffs.dt}{Data.table with columns for coefficient and SE of
+regression of exposure on instrument: \code{alpha_hat},
+\code{se.alpha_hat}),
+regression of outcome on instrument: \code{gamma_hat},
+\code{se.gamma_hat} and coefficient ratios:
+\code{theta_IV}, \code{se.theta_IV}.}
 }
 \value{
-Table of estimates for weighted mean, weighted median, and penalized weighted median of instrumental variable estimates.
+A data.table of estimates for weighted mean, weighted median, and
+        penalized weighted median of instrumental variable estimates.
 }
 \description{
-calculate conventional MR estimators from summary stats
+Calculate conventional MR estimators from summary stats.
+}
+\note{
+Details on penalized weighted median estimator can be found in
+      Bowden J, Davey Smith G, Haycock PC, Burgess S. Consistent Estimation
+      in Mendelian Randomization with Some Invalid Instruments Using a
+      Weighted Median Estimator. Genet Epidemiol. 2016 May;40(4):304-14.
+      doi: 10.1002/gepi.21965. Epub 2016 Apr 7. PMID: 27061298;
+      PMCID: PMC4849733.
 }

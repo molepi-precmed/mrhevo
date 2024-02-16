@@ -2,7 +2,7 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{format.z.aspvalue}
 \alias{format.z.aspvalue}
-\title{generate formatted p-values from z values}
+\title{Generate formatted p-values from z values.}
 \usage{
 \method{format}{z.aspvalue}(z, sigfig = 1, neglogp.threshold.scinot = 3, neglogp.threshold = NULL)
 }
@@ -11,12 +11,15 @@
 
 \item{sigfig}{Number of significant figures to show in p-values.}
 
-\item{neglogp.threshold.scinot}{Minus log10(pvalue) threshold for scientific notation.}
+\item{neglogp.threshold.scinot}{Minus log10(pvalue) threshold for scientific
+notation.}
 
-\item{neglogp.threshold}{Minus log10(pvalue) cutoff for thresholding p-values.}
-
-\item{returns}{Vector of formatted p-values.}
+\item{neglogp.threshold}{Minus log10(pvalue) cutoff for thresholding
+p-values.}
+}
+\value{
+Vector of formatted p-values.
 }
 \description{
-generate formatted p-values from z values
+Generate formatted p-values from z values.
 }

@@ -2,7 +2,8 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{run_mrhevo.fixedtau}
 \alias{run_mrhevo.fixedtau}
-\title{run Stan model for Mendelian randomization with regularized horsehoe prior on pleiotropic effects, using summary statistics only.}
+\title{Run Stan model for Mendelian randomization with regularized horsehoe prior
+on pleiotropic effects, using summary statistics only.}
 \usage{
 run_mrhevo.fixedtau(
   alpha_hat,
@@ -12,15 +13,18 @@ run_mrhevo.fixedtau(
   tau = 1e-06,
   slab_scale = 0.2,
   slab_df = 2,
-  priorsd_theta = 1
+  priorsd_theta = 1,
+  model.dir
 )
 }
 \arguments{
-\item{alpha_hat}{Vector of estimated coefficients for effect of instruments on exposure.}
+\item{alpha_hat}{Vector of estimated coefficients for effect of instruments
+on exposure.}
 
 \item{se.alpha_hat}{Vector of standard errors for coefficients alpha_hat.}
 
-\item{gamma_hat}{Vector of estimated coefficients for effect of instruments on outcome.}
+\item{gamma_hat}{Vector of estimated coefficients for effect of instruments
+on outcome.}
 
 \item{se.gamma_hat}{Vector of standard errors for coefficients gamma_hat.}
 
@@ -28,11 +32,15 @@ run_mrhevo.fixedtau(
 
 \item{priorsd_theta}{Standard deviation of prior on theta.}
 
-\item{fraction_pleio}{Prior guess at fraction of instruments that have pleiotropic effects: values between 0.05 and 0.95 are allowed.}
+\item{model.dir}{Full path to STAN model directory.}
+
+\item{fraction_pleio}{Prior guess at fraction of instruments that have
+pleiotropic effects: values between 0.05 and 0.95 are allowed.}
 }
 \value{
 An object of class stanfit.
 }
 \description{
-run Stan model for Mendelian randomization with regularized horsehoe prior on pleiotropic effects, using summary statistics only.
+Run Stan model for Mendelian randomization with regularized horsehoe prior
+on pleiotropic effects, using summary statistics only.
 }

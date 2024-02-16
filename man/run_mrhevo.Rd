@@ -2,7 +2,8 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{run_mrhevo}
 \alias{run_mrhevo}
-\title{run Stan model for Mendelian randomization with regularized horsehoe prior on pleiotropic effects}
+\title{Run Stan model for Mendelian randomization with regularized horsehoe prior
+on pleiotropic effects.}
 \usage{
 run_mrhevo(
   use.sampling = TRUE,
@@ -16,35 +17,44 @@ run_mrhevo(
   fraction_pleio = NULL,
   slab_scale = 0.25,
   priorsd_theta = 1,
-  vb.algo = "meanfield"
+  vb.algo = "meanfield",
+  model.dir
 )
 }
 \arguments{
-\item{logistic}{If TRUE, uses logistic rather than linear regression.}
+\item{logistic}{Logical. If set to \code{TRUE}, uses logistic rather than
+linear regression.}
 
-\item{Z}{Data.table of genetic instruments..}
+\item{Z}{Data.table of genetic instruments.}
 
 \item{Y}{Vector of outcomes.}
 
-\item{sigma_y}{Standard deviation of outcome variable, used only if logistic=FALSE.}
+\item{sigma_y}{Standard deviation of outcome variable. Used only if
+\code{logistic=FALSE}.}
 
 \item{X_u}{Data.table of unpenalized covariates.}
 
-\item{alpha_hat}{Vector of estimated coefficients for effect of instruments on exposure.}
+\item{alpha_hat}{Vector of estimated coefficients for effect of instruments
+on exposure.}
 
 \item{se.alpha_hat}{Vector of standard errors for coefficients alpha_hat.}
 
-\item{fraction_pleio}{Prior guess at fraction of instruments that have pleiotropic effects: values between 0.05 and 0.95 are allowed.}
+\item{fraction_pleio}{Prior guess at fraction of instruments that have
+pleiotropic effects: values between 0.05 and 0.95 are allowed.}
 
 \item{priorsd_theta}{Standard deviation of prior on theta.}
 
-\item{sampling}{If TRUE, uses sampling rather than variational approximation.}
+\item{model.dir}{Full path to STAN model directory.}
+
+\item{sampling}{Logical. If set to \code{TRUE}, uses sampling rather than
+variational approximation.}
 }
 \value{
 An object of class stanfit.
 }
 \description{
-run Stan model for Mendelian randomization with regularized horsehoe prior on pleiotropic effects
+Run Stan model for Mendelian randomization with regularized horsehoe prior
+on pleiotropic effects.
 }
 \examples{
 #' Example of a complete MRHevo analysis of the exemplar dataset coeffs.dt,
@@ -96,7 +106,8 @@ hevo.stanfit <-
                       se.gamma_hat=coeffs.dt$se.gamma_hat,
                       slab_scale=slab_scale,
                       slab_df=slab_df,
-                      priorsd_theta=1)
+                      priorsd_theta=1,
+                      model.dir=devtools::package_file())
 options(warn=2)
 
 ## get sampler diagnostics
@@ -170,7 +181,8 @@ p.coeffs <- ggplot(coeffs.dt,
                        aes(x=alpha_hat, y=gamma_hat)) +
     geom_point(aes(size=size.theta_IV), alpha=0.8) +
     scale_size(guide="none") +
-    ggrepel::geom_text_repel(aes(label=qtlname), force=5, size=2.5, fontface="italic", color="blue") +
+    ggrepel::geom_text_repel(aes(label=qtlname),
+                             force=5, size=2.5, fontface="italic", color="blue") +
     scale_x_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) +
     scale_y_continuous(limits = c(min(c(coeffs.dt$gamma_hat, 0)),
                                   max(c(coeffs.dt$gamma_hat, 0))),

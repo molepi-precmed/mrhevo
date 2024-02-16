@@ -2,12 +2,13 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{get_summarystatsforMR}
 \alias{get_summarystatsforMR}
-\title{calculate summary stats for second step of two-step Mendelian randomization}
+\title{Calculate summary stats for second step of two-step Mendelian randomization.}
 \usage{
 get_summarystatsforMR(Y, Z, X_u)
 }
 \arguments{
-\item{Y}{Integer vector of binary outcome or numeric vector of continuous outcome.}
+\item{Y}{Integer vector of binary outcome or numeric vector of continuous
+outcome.}
 
 \item{Z}{Data.table of genetic instruments.}
 
@@ -17,5 +18,5 @@ get_summarystatsforMR(Y, Z, X_u)
 Data.table of coefficients for each genetic instrument
 }
 \description{
-calculate summary stats for second step of two-step Mendelian randomization
+Calculate summary stats for second step of two-step Mendelian randomization.
 }

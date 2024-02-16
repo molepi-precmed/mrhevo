@@ -2,7 +2,7 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{pnorm.extreme}
 \alias{pnorm.extreme}
-\title{return upper bound on p-value  where z is so extreme that pnorm(-z) returns zero}
+\title{Return upper bound on p-value where z is so extreme that pnorm(-z) returns 0.}
 \usage{
 pnorm.extreme(z, upper = TRUE)
 }
@@ -13,5 +13,5 @@ pnorm.extreme(z, upper = TRUE)
 A string in scientific notation.
 }
 \description{
-return upper bound on p-value  where z is so extreme that pnorm(-z) returns zero
+Return upper bound on p-value where z is so extreme that pnorm(-z) returns 0.
 }

@@ -47,7 +47,8 @@ hevo.stanfit <-
                       se.gamma_hat=coeffs.dt$se.gamma_hat,
                       slab_scale=slab_scale,
                       slab_df=slab_df,
-                      priorsd_theta=1)
+                      priorsd_theta=1,
+                      model.dir=devtools::package_file())
 options(warn=2)
 
 ## get sampler diagnostics
@@ -121,7 +122,8 @@ p.coeffs <- ggplot(coeffs.dt,
                        aes(x=alpha_hat, y=gamma_hat)) +
     geom_point(aes(size=size.theta_IV), alpha=0.8) +
     scale_size(guide="none") +
-    ggrepel::geom_text_repel(aes(label=qtlname), force=5, size=2.5, fontface="italic", color="blue") +
+    ggrepel::geom_text_repel(aes(label=qtlname),
+                             force=5, size=2.5, fontface="italic", color="blue") +
     scale_x_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) +
     scale_y_continuous(limits = c(min(c(coeffs.dt$gamma_hat, 0)),
                                   max(c(coeffs.dt$gamma_hat, 0))),

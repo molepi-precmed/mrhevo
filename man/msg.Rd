@@ -2,7 +2,7 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{msg}
 \alias{msg}
-\title{Report a message to the terminal}
+\title{Report a message to the terminal.}
 \usage{
 msg(mode, ..., LF = TRUE)
 }
@@ -17,5 +17,5 @@ the user should definitely notice).}
 message (\code{TRUE} by default).}
 }
 \description{
-Report a message to the terminal
+Report a message to the terminal.
 }

@@ -2,14 +2,17 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{get_coeffratios}
 \alias{get_coeffratios}
-\title{calculate ratios of coefficients}
+\title{Calculate ratios of coefficients.}
 \usage{
 get_coeffratios(coeffs.dt, use.delta = FALSE)
 }
+\arguments{
+\item{coeffs.dt}{Data table with coefficients for each genetic instrument.}
+}
 \value{
-Input data.table plus a column containing ratios of coefficients
-              for each genetic instrument.
+A data.table with coefficients for genetic instruments plus a column
+        containing ratios of coefficients for each genetic instrument.
 }
 \description{
-calculate ratios of coefficients
+Calculate ratios of coefficients.
 }

@@ -2,20 +2,29 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{mle.se.pval}
 \alias{mle.se.pval}
-\title{calculate maximum likelihood estimate and p-value from posterior samples and prior}
+\title{Calculate maximum likelihood estimate and p-value from posterior samples and
+prior.}
 \usage{
 mle.se.pval(x, prior, return.asplot = FALSE)
 }
 \arguments{
-\item{x}{Numeric vector of samples from the posterior distribution of the parameter.}
+\item{x}{Numeric vector of samples from the posterior distribution of the
+parameter.}
 
-\item{prior}{Numeric vector of values of the prior density for each element of x.}
+\item{prior}{Numeric vector of values of the prior density for each element
+of x.}
 
-\item{return.asplot}{Logical value determines whether the function returns maximum likelihood estimate or a plot of the posterior density and log-likelihood.}
+\item{return.asplot}{Logical value determines whether the function returns
+maximum likelihood estimate or a plot of the posterior
+density and log-likelihood.}
 }
 \value{
-If return.asplot is FALSE, data.table with one row containing maximum likelihood estimate, standard error, test statistic, p-value, formatted p-value.
+If \code{return.asplot} is FALSE, return data.table with one row
+        containing maximum likelihood estimate, standard error,
+        test statistic, p-value, formatted p-value. Otherwise, create a plot
+        of posterior density and log-likelihood.
 }
 \description{
-calculate maximum likelihood estimate and p-value from posterior samples and prior
+Calculate maximum likelihood estimate and p-value from posterior samples and
+prior.
 }

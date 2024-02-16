@@ -2,7 +2,8 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{set.tau0}
 \alias{set.tau0}
-\title{get value tau0 for global shrinkage parameter tau given expectation of fraction_pleio}
+\title{Get value \code{tau0} for global shrinkage parameter \code{tau} given
+expectation of \code{fraction_pleio}.}
 \usage{
 set.tau0(fraction_pleio = NULL, nu_global = 1, J, info)
 }
@@ -11,13 +12,14 @@ set.tau0(fraction_pleio = NULL, nu_global = 1, J, info)
 
 \item{nu_global}{Shape parameter of gamma prior.}
 
-\item{J}{number of variables. .}
+\item{J}{number of variables.}
 
-\item{pseudovariance}{Variance of outcome variable}
+\item{pseudovariance}{Variance of outcome variable.}
 }
 \value{
 Value of tau0.
 }
 \description{
-get value tau0 for global shrinkage parameter tau given expectation of fraction_pleio
+Get value \code{tau0} for global shrinkage parameter \code{tau} given
+expectation of \code{fraction_pleio}.
 }
