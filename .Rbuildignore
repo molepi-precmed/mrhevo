@@ -1,0 +1,21 @@
+## directories and files
+man-roxygen
+tests
+
+## patterns
+^prof
+^score
+.txt$
+.gz$
+.sh$
+.Rcheck$
+.Rdata$
+.Rhistory
+.git
+.stan
+.RDS
+.gitignore
+.Rmd
+.md
+.pdf
+.html
