@@ -2,7 +2,7 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{run_mrhevo.sstats}
 \alias{run_mrhevo.sstats}
-\title{Run Stan model for Mendelian randomization with regularized horsehoe prior
+\title{Run Stan model for Mendelian randomization with regularized horseshoe prior
 on pleiotropic effects, using summary statistics only.}
 \usage{
 run_mrhevo.sstats(
@@ -14,7 +14,8 @@ run_mrhevo.sstats(
   slab_scale = 0.2,
   slab_df = 2,
   priorsd_theta = 1,
-  model.dir
+  iter = 4000,
+  warmup = 2000
 )
 }
 \arguments{
@@ -34,13 +35,11 @@ pleiotropic effects: values between 0.05 and 0.95 are allowed.}
 \item{slab_scale}{scale param of prior on direct effects.}
 
 \item{priorsd_theta}{Standard deviation of prior on theta.}
-
-\item{model.dir}{Full path to STAN model directory.}
 }
 \value{
 An object of class stanfit.
 }
 \description{
-Run Stan model for Mendelian randomization with regularized horsehoe prior
+Run Stan model for Mendelian randomization with regularized horseshoe prior
 on pleiotropic effects, using summary statistics only.
 }

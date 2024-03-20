@@ -47,8 +47,7 @@ hevo.stanfit <-
                       se.gamma_hat=coeffs.dt$se.gamma_hat,
                       slab_scale=slab_scale,
                       slab_df=slab_df,
-                      priorsd_theta=1,
-                      model.dir=devtools::package_file())
+                      priorsd_theta=1)
 options(warn=2)
 
 ## get sampler diagnostics

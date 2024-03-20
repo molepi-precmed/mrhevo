@@ -11,7 +11,7 @@ get_coeffratios(coeffs.dt, use.delta = FALSE)
 }
 \value{
 A data.table with coefficients for genetic instruments plus a column
-        containing ratios of coefficients for each genetic instrument.
+containing ratios of coefficients for each genetic instrument.
 }
 \description{
 Calculate ratios of coefficients.

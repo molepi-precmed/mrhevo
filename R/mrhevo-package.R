@@ -1,10 +1,7 @@
-## mrhevo.R
-##
-## Package documentation and namespace hooks.
-##
-
-#' Inference of causal effects by Mendelian randomisation, marginalising over
-#' distribution of direct effects
+#' The 'mrhevo' package.
+#'
+#' @description Inference of causal effects by Mendelian randomisation,
+#'              marginalising over distribution of direct effects.
 #'
 #' @author
 #' Paul McKeigue \email{paul.mckeigue@@ed.ac.uk},
@@ -13,14 +10,28 @@
 #' Athina Spiliopoulou \email{a.spiliopoulou@@ed.ac.uk}
 #'
 #' @docType package
-"_PACKAGE"
-
-## Environment for package global variables
-mrhevo.env <- new.env(parent=emptyenv())
-
+#' @name mrhevo-package
+#' @aliases mrhevo
+#' @useDynLib mrhevo, .registration = TRUE
+#' @import methods
+#' @import Rcpp
 #' @import doParallel
 #' @import foreach
 #' @importFrom utils packageVersion
+#' @importFrom rstan sampling
+#' @importFrom rstantools rstan_config
+#' @importFrom RcppParallel RcppParallelLibs
+#'
+#' @references
+#' Stan Development Team (NA). RStan: the R interface to Stan. R package version 2.32.3. https://mc-stan.org
+#'
+NULL
+
+.onLoad <- function(libname, pkgname) {
+    modules <- paste0("stan_fit4", names(stanmodels), "_mod")
+    for (m in modules) Rcpp::loadModule(m, what = TRUE)
+}
+
 .onAttach <- function(libname, pkgname) {
     ## put a cap on the number of cores used by default
     if (is.null(getOption("cores")))

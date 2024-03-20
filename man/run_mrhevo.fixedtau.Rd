@@ -2,7 +2,7 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{run_mrhevo.fixedtau}
 \alias{run_mrhevo.fixedtau}
-\title{Run Stan model for Mendelian randomization with regularized horsehoe prior
+\title{Run Stan model for Mendelian randomization with regularized horseshoe prior
 on pleiotropic effects, using summary statistics only.}
 \usage{
 run_mrhevo.fixedtau(
@@ -41,6 +41,6 @@ pleiotropic effects: values between 0.05 and 0.95 are allowed.}
 An object of class stanfit.
 }
 \description{
-Run Stan model for Mendelian randomization with regularized horsehoe prior
+Run Stan model for Mendelian randomization with regularized horseshoe prior
 on pleiotropic effects, using summary statistics only.
 }

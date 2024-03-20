@@ -20,9 +20,9 @@ density and log-likelihood.}
 }
 \value{
 If \code{return.asplot} is FALSE, return data.table with one row
-        containing maximum likelihood estimate, standard error,
-        test statistic, p-value, formatted p-value. Otherwise, create a plot
-        of posterior density and log-likelihood.
+containing maximum likelihood estimate, standard error,
+test statistic, p-value, formatted p-value. Otherwise, create a plot
+of posterior density and log-likelihood.
 }
 \description{
 Calculate maximum likelihood estimate and p-value from posterior samples and

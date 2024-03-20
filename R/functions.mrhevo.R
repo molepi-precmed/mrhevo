@@ -253,6 +253,9 @@ get_estimatorsMR <- function(coeffs.dt) {
 #' @import cowplot car
 #' @export
 mle.se.pval <- function(x, prior, return.asplot=FALSE) {
+    ## TODO: potential solution to this is to use bayestestR package
+    ## https://doi.org/10.3389/fpsyg.2019.02767
+    ## https://discourse.mc-stan.org/t/p-value-estimation-by-montecarlo-sampling/24447/8
     invprior <- 1 / prior
     invprior <- invprior / sum(invprior)
 
@@ -261,7 +264,7 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
     ## when fitting a kernel density (usually Sheather-Jones is preferred to
     ## default bw)
     ## wider bandwidth gives better approximation to quadratic
-    lik <- density(x, bw="SJ", adjust=2, weights=invprior)
+    lik <- density(x, bw="SJ", adjust=4, weights=invprior)
     nonzero.lik <- which(lik$y > 0)
     logl <- log(lik$y[nonzero.lik])
     xvals <- lik$x[nonzero.lik]
@@ -318,7 +321,7 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
     }
 }
 
-#' Run Stan model for Mendelian randomization with regularized horsehoe prior
+#' Run Stan model for Mendelian randomization with regularized horseshoe prior
 #' on pleiotropic effects.
 #'
 #' @param sampling Logical. If set to \code{TRUE}, uses sampling rather than
@@ -346,13 +349,10 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
 run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
                        Z, Y, sigma_y=1, X_u, alpha_hat, se.alpha_hat,
                        fraction_pleio=NULL, slab_scale=0.25, priorsd_theta=1,
-                       vb.algo="meanfield", model.dir) {
-    rstan_options(auto_write = TRUE)
+                       vb.algo="meanfield") {
 
-    msg(bold, "Compiling stan model ... ")
-    mr.stanmodel <- stan_model(file=file.path(model.dir, "MRHevo_logistic.stan"),
-                               model_name="MRHevo.logistic", verbose=FALSE)
-    msg(note, "Done.\n")
+    mr.stanmodel <- stanmodels$MRHevo_logistic
+    if (!logistic) mr.stanmodel <- stanmodels$MRHevo_linear
 
     ## check arguments for consistency
     stopifnot(length(unique(c(nrow(Z), nrow(X_u), length(Y)))) == 1)
@@ -414,18 +414,18 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
 
     ## sample the posterior
     data.stan <- list(logistic=as.integer(logistic),
-                    Z=as.matrix(Z), Y=Y, X_u=as.matrix(X_u),
-                    N=N, J=J, U=ncol(X_u),
-                    alpha_hat=alpha_hat,
-                    sd_alpha_hat=se.alpha_hat,
-                    nu_global=nu_global,
-                    nu_local=nu_local,
-                    scale_global=scale_global,
-                    scale_intercept_y=scale_intercept_y,
-                    scale_beta_u=scale_beta_u,
-                    priorsd_theta=priorsd_theta,
-                    slab_scale=slab_scale,
-                    slab_df=slab_df, priorsd_theta=priorsd_theta)
+                      Z=as.matrix(Z), Y=Y, X_u=as.matrix(X_u),
+                      N=N, J=J, U=ncol(X_u),
+                      alpha_hat=alpha_hat,
+                      sd_alpha_hat=se.alpha_hat,
+                      nu_global=nu_global,
+                      nu_local=nu_local,
+                      scale_global=scale_global,
+                      scale_intercept_y=scale_intercept_y,
+                      scale_beta_u=scale_beta_u,
+                      priorsd_theta=priorsd_theta,
+                      slab_scale=slab_scale,
+                      slab_df=slab_df, priorsd_theta=priorsd_theta)
 
     if (use.sampling) {
         fit.mc <- rstan::sampling(object=mr.stanmodel,
@@ -448,7 +448,7 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
     return(fit.mc)
 }
 
-#' Run Stan model for Mendelian randomization with regularized horsehoe prior
+#' Run Stan model for Mendelian randomization with regularized horseshoe prior
 #' on pleiotropic effects, using summary statistics only.
 #'
 #' @param alpha_hat Vector of estimated coefficients for effect of instruments
@@ -461,23 +461,14 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
 #'        pleiotropic effects: values between 0.05 and 0.95 are allowed.
 #' @param slab_scale scale param of prior on direct effects.
 #' @param priorsd_theta Standard deviation of prior on theta.
-#' @param model.dir Full path to STAN model directory.
 #'
 #' @return An object of class stanfit.
 #' @export
 run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                               fraction_pleio=NULL, slab_scale=0.2, slab_df=2,
-                              priorsd_theta=1, model.dir) {
-    require(rstan)
-    options(mc.cores = parallel::detectCores())
-    rstan_options(auto_write = TRUE)
+                              priorsd_theta=1, iter=4000, warmup=2000) {
 
-    msg(bold, "Compiling stan model ... ")
-    mr.sstats.stanmodel <- stan_model(file=file.path(model.dir,
-                                                     "MRHevo_summarystats.stan"),
-                                      model_name="MRHevo.summarystats",
-                                      verbose=FALSE)
-    msg(note, "Done.\n")
+    mr.stanmodel <- stanmodels$MRHevo_summarystats
 
     ## check arguments for consistency
     stopifnot(length(alpha_hat)==length(gamma_hat))
@@ -520,11 +511,11 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                       scale_global=scale_global,
                       priorsd_theta=priorsd_theta,
                       slab_scale=slab_scale,
-                      slab_df=slab_df, priorsd_theta=priorsd_theta)
+                      slab_df=slab_df)
     msg(bold, "Sampling posterior distribution ... ")
-    fit.mc <- rstan::sampling(object=mr.sstats.stanmodel,
+    fit.mc <- rstan::sampling(object=mr.stanmodel,
                               data=data.stan,
-                              iter=3000, warmup=1000,
+                              iter=iter, warmup=warmup,
                               cores=4,
                               chains=4,
                               refresh=1000,
@@ -534,7 +525,7 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
     return(fit.mc)
 }
 
-#' Run Stan model for Mendelian randomization with regularized horsehoe prior
+#' Run Stan model for Mendelian randomization with regularized horseshoe prior
 #' on pleiotropic effects, using summary statistics only.
 #'
 #' @param alpha_hat Vector of estimated coefficients for effect of instruments
@@ -554,17 +545,11 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
 run_mrhevo.fixedtau <- function(alpha_hat, se.alpha_hat, gamma_hat,
                                 se.gamma_hat, tau=1E-6, slab_scale=0.2,
                                 slab_df=2, priorsd_theta=1, model.dir) {
-    rstan_options(auto_write = TRUE)
 
     ## check arguments for consistency
     stopifnot(length(alpha_hat)==length(gamma_hat))
 
-    msg(bold, "Compiling stan model ... ")
-    mr.fixedtau.stanmodel <- stan_model(file=file.path(model.dir,
-                                                       "MRHevo_fixedtau.stan"),
-                                        model_name="MRHevo.fixedtau",
-                                        verbose=FALSE)
-    msg(note, "Done.\n")
+    mr.stanmodel <- stanmodels$MRHevo_fixedtau
 
     J <- length(alpha_hat)
 
@@ -584,7 +569,7 @@ run_mrhevo.fixedtau <- function(alpha_hat, se.alpha_hat, gamma_hat,
                       slab_df=slab_df, priorsd_theta=priorsd_theta)
 
     msg(bold, "Sampling posterior distribution ... ")
-    fit.mc <- rstan::sampling(object=mr.fixedtau.stanmodel,
+    fit.mc <- rstan::sampling(object=mr.stanmodel,
                               data=data.stan,
                               iter=3000, warmup=1000,
                               cores=4,

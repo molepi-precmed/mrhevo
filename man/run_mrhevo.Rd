@@ -2,7 +2,7 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{run_mrhevo}
 \alias{run_mrhevo}
-\title{Run Stan model for Mendelian randomization with regularized horsehoe prior
+\title{Run Stan model for Mendelian randomization with regularized horseshoe prior
 on pleiotropic effects.}
 \usage{
 run_mrhevo(
@@ -17,8 +17,7 @@ run_mrhevo(
   fraction_pleio = NULL,
   slab_scale = 0.25,
   priorsd_theta = 1,
-  vb.algo = "meanfield",
-  model.dir
+  vb.algo = "meanfield"
 )
 }
 \arguments{
@@ -44,16 +43,16 @@ pleiotropic effects: values between 0.05 and 0.95 are allowed.}
 
 \item{priorsd_theta}{Standard deviation of prior on theta.}
 
-\item{model.dir}{Full path to STAN model directory.}
-
 \item{sampling}{Logical. If set to \code{TRUE}, uses sampling rather than
 variational approximation.}
+
+\item{model.dir}{Full path to STAN model directory.}
 }
 \value{
 An object of class stanfit.
 }
 \description{
-Run Stan model for Mendelian randomization with regularized horsehoe prior
+Run Stan model for Mendelian randomization with regularized horseshoe prior
 on pleiotropic effects.
 }
 \examples{
@@ -106,8 +105,7 @@ hevo.stanfit <-
                       se.gamma_hat=coeffs.dt$se.gamma_hat,
                       slab_scale=slab_scale,
                       slab_df=slab_df,
-                      priorsd_theta=1,
-                      model.dir=devtools::package_file())
+                      priorsd_theta=1)
 options(warn=2)
 
 ## get sampler diagnostics

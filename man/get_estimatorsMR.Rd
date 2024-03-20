@@ -16,16 +16,16 @@ regression of outcome on instrument: \code{gamma_hat},
 }
 \value{
 A data.table of estimates for weighted mean, weighted median, and
-        penalized weighted median of instrumental variable estimates.
+penalized weighted median of instrumental variable estimates.
 }
 \description{
 Calculate conventional MR estimators from summary stats.
 }
 \note{
 Details on penalized weighted median estimator can be found in
-      Bowden J, Davey Smith G, Haycock PC, Burgess S. Consistent Estimation
-      in Mendelian Randomization with Some Invalid Instruments Using a
-      Weighted Median Estimator. Genet Epidemiol. 2016 May;40(4):304-14.
-      doi: 10.1002/gepi.21965. Epub 2016 Apr 7. PMID: 27061298;
-      PMCID: PMC4849733.
+Bowden J, Davey Smith G, Haycock PC, Burgess S. Consistent Estimation
+in Mendelian Randomization with Some Invalid Instruments Using a
+Weighted Median Estimator. Genet Epidemiol. 2016 May;40(4):304-14.
+doi: 10.1002/gepi.21965. Epub 2016 Apr 7. PMID: 27061298;
+PMCID: PMC4849733.
 }
