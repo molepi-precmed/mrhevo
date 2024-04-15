@@ -9,20 +9,15 @@
 ## sampler diagnostics, pairs plot, trace plot, max likelihood estimate, plot posterior density, posterior summaries, plot shrinkage coefficients, plot coeffs
 
 library(data.table)
-library(rstan)
 library(ggrepel)
-library(ggplotify)
 
 source("../mrhevo/functions.mrhevo.R")
-
-options(mc.cores = parallel::detectCores())
-rstan_options(auto_write = TRUE)
 
 ## exemplar dataset to be included in package
 ## dataset should have columns named qtlname, alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat
 ## other columns are optional
-coeffs.dt <- readRDS("./coeffs_ADIPOQ_UKBB.RDS")
-#coeffs.dt <- readRDS("../mrhevo/coeffs_CLC_asthma_UKBB.RDS")
+#coeffs.dt <- readRDS("./coeffs_ADIPOQ_UKBB.RDS")
+coeffs.dt <- readRDS("./coeffs_LPL_t2d.diag_1704571.RDS")[qtl_type=="trans"]
 #coeffs.dt <- coeffs.dt[minpvalue < 1E-8]
 ## calculate coefficient ratios for each instrument
 coeffs.dt <- get_coeffratios(coeffs.dt, use.delta=TRUE)
@@ -34,38 +29,58 @@ fraction_pleio <- 0.2
 
 priorsd_theta <- 1  # prior doesn't matter as we will divide posterior by it to get likelihood
 
+f.errorsq <- function(tau, info, f.target) {
+    asq <- info * tau^2
+    f.expected <- 1 - mean(1 / (1 + asq))
+    return((f.target - f.expected)^2)
+}
+
+tau0 <- optimize(f.errorsq, interval=c(0, 1), info=coeffs.dt$inv.var,
+                 f.target=fraction_pleio, 
+                 lower=0, upper=1)$minimum
+
+alpha_hat <- coeffs.dt$alpha_hat
+se.alpha_hat <- coeffs.dt$se.alpha_hat
+gamma_hat <- coeffs.dt$gamma_hat
+se.gamma_hat <- coeffs.dt$se.gamma_hat
+info <- coeffs.dt$inv.var 
+tau0 <- tau0 
+slab_scale <- slab_scale
+slab_df <- slab_df 
+priorsd_theta <- 1.0
+
+save(alpha_hat,
+     se.alpha_hat,
+     gamma_hat,
+     se.gamma_hat,
+     info, 
+     tau0, 
+     slab_scale,
+     slab_df, 
+     priorsd_theta,
+     file="mrhevo_example.RData")
+
+regularized=TRUE
+
 ## run Bayesian analysis to generate object of class stanfit
-options(warn=1)
-hevo.stanfit <-
-    run_mrhevo.sstats(fraction_pleio=fraction_pleio,
-   # run_mrhevo.fixedtau(tau=1E-6,
-                      alpha_hat=coeffs.dt$alpha_hat,
-                      se.alpha_hat=coeffs.dt$se.alpha_hat,
-                      gamma_hat=coeffs.dt$gamma_hat,
-                      se.gamma_hat=coeffs.dt$se.gamma_hat,
-                      slab_scale=slab_scale,
-                      slab_df=slab_df, 
-                      priorsd_theta=1)
-options(warn=2)
+source("mrhevo_pyro.R")
 
 ## sampler diagnostics
-num.divergent <- get_num_divergent(hevo.stanfit)
-num.maxtreedepth <- get_num_max_treedepth(hevo.stanfit)
+#num.divergent <- get_num_divergent(hevo.stanfit)
+#num.maxtreedepth <- get_num_max_treedepth(hevo.stanfit)
 
-## pairs plot of posterior samples
-p.pairs <- ggplotify::as.ggplot(function() {
-    pairs(hevo.stanfit,
-          pars=c("theta", "log_c", "log_tau", "f", "lp__"))
-})
-p.pairs
+if(regularized) {
+    pars.global <- c("theta", "log_c", "log_tau", "f")
+} else {
+    pars.global <- c("theta", "log_tau", "f")
+}
 
-## trace plot of posterior samples
-p.traceplot <-  traceplot(hevo.stanfit,
-                          pars=c("theta", "log_c", "log_tau", "f", "lp__"),
-                          inc_warmup=FALSE)
+global.summarystats <- mrhevo.summaries.dt[param %in% pars.global]
+global.summarystats[, index := NULL]
+global.summarystats[, lapply(.SD, round, 3), by=param, .SDcols=2:4]
 
 ## maximum likelihood estimate of theta from posterior density
-theta.samples <-  unlist(extract(hevo.stanfit, pars="theta"))
+theta.samples <-  mrhevo_samples.list[["theta"]]
 prior.theta <- dnorm(theta.samples, mean=0, sd=priorsd_theta)
 mle.theta <- mle.se.pval(x=theta.samples, prior=prior.theta)
 mle.theta[, Estimator := "Marginalize over direct effects"]
@@ -75,43 +90,34 @@ options(warn=1)
 p.bayesian.loglik <-  mle.se.pval(x=theta.samples, prior=prior.theta, return.asplot=TRUE)
 options(warn=2)
 
-## tabulate posterior summaries for global parameters
-pars.forsummary <- c("theta", "log_c", "log_tau", "f", "lp__", "beta", "kappa")
-
-fit.coeffs <- summary(hevo.stanfit,
-                      pars=pars.forsummary, 
-                      probs=c(0.1, 0.9))$summary 
-fit.coeffs <- as.data.table(round(fit.coeffs, 3), keep.rownames="variable")
-fit.coeffs <- fit.coeffs[, .(variable, mean, `10%`, `90%`, n_eff, Rhat)]
-fit.coeffs[, n_eff := round(n_eff, 2)]
-
-qtlnames <- coeffs.dt$qtlname
-fit.coeffs[grep("beta\\[", variable), qtlname := ..qtlnames]
-fit.coeffs[grep("kappa\\[", variable), qtlname := ..qtlnames]
-fit.coeffs[qtlname=="", qtlname := variable]  
-fit.coeffs
+J <- nrow(coeffs.dt)
 
 ## plot shrinkage coefficients
-p.shrinkage <- ggplot(data=fit.coeffs[grep("kappa", variable)],
-                      aes(y=qtlname, x=mean, xmin=`10%`, xmax=`90%`)) +
+kappa.coeffs <- mrhevo.summaries.dt[param=="kappa"]
+kappa.coeffs <- data.table(coeffs.dt[, .(qtlname)], kappa.coeffs)
+kappa.coeffs[qtlname=="", qtlname := paste0("QTL_", .I)]
+p.kappa <- ggplot(data=kappa.coeffs,
+                      aes(y=qtlname, x=`50%`, xmin=`10%`, xmax=`90%`)) +
     geom_pointrange()
-p.shrinkage
+p.kappa
 
-p.beta <- ggplot(data=fit.coeffs[grep("beta", variable)],
-                      aes(y=qtlname, x=mean, xmin=`10%`, xmax=`90%`)) +
-    geom_pointrange() + 
-    geom_vline(xintercept=0, linetype="dotted")
+beta.coeffs <- mrhevo.summaries.dt[param=="beta"]
+beta.coeffs <- data.table(coeffs.dt[, .(qtlname)], beta.coeffs)
+beta.coeffs[qtlname=="", qtlname := paste0("QTL_", .I)]
+p.beta <- ggplot(data=beta.coeffs,
+                      aes(y=qtlname, x=`50%`, xmin=`10%`, xmax=`90%`)) +
+    geom_pointrange()
 p.beta
 
 ## get MR "estimators": weighted mean, weighted median, penalized weighted median
 ## append MRHevo estimate
-estimators <- get_estimatorsMR(coeffs.dt)
+estimators <- get_estimatorsMR(coeffs.dt, use.delta=TRUE)
 estimators <- rbind(estimators, mle.theta, fill=TRUE)
 
-## plot coefficients and show estimators as slopes of lines through origin
+## plot raw coefficients and show estimators as slopes of lines through origin
 p.coeffs <- ggplot(coeffs.dt,
                        aes(x=alpha_hat, y=gamma_hat)) + 
-    geom_point(aes(size=size.theta_IV), alpha=0.8) +
+    geom_point(aes(size=sqrt(max(inv.var) / inv.var)), alpha=0.8) +
     scale_size(guide="none") + 
     ggrepel::geom_text_repel(aes(label=qtlname), force=5, size=2.5, fontface="italic", color="blue") + 
     scale_x_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) + 
@@ -123,48 +129,12 @@ p.coeffs <- ggplot(coeffs.dt,
                     linetype=Estimator)) +
     labs(linetype="Estimate of causal effect as slope of line through origin") + 
     theme(legend.position="top") +
-    theme(legend.direction="vertical") +
+    theme(legend.direction="vertical") 
     theme(legend.box="horizontal") +
-    xlab(paste("Effect of genetic instrument on exposure")) +
-    ylab(paste("Effect on outcome"))
+    xlab(paste("Summary statistic for effect of genetic instrument on exposure")) +
+    ylab(paste("Summary statistic for effect on outcome"))
 options(warn=1)
 p.coeffs
 options(warn=2)
 
-pars.fitted <- c("alpha", "beta", "theta")
-
-fitted.coeffs <- extract(hevo.stanfit, pars=pars.fitted) 
-
-fitted.coeffs[[1]] <- as.data.table(fitted.coeffs[[1]])
-colnames(fitted.coeffs[[1]]) <- coeffs.dt$qtlname
-fitted.coeffs[[1]][, iteration := .I]
-fitted.coeffs[[1]] <- melt(fitted.coeffs[[1]], id.vars="iteration",
-                           variable.name="qtlname", value.name="alpha")
-
-fitted.coeffs[[2]] <- as.data.table(fitted.coeffs[[2]])
-colnames(fitted.coeffs[[2]]) <- coeffs.dt$qtlname
-fitted.coeffs[[2]][, iteration := .I]
-fitted.coeffs[[2]] <- melt(fitted.coeffs[[2]], id.vars="iteration",
-                           variable.name="qtlname", value.name="beta")
-
-fitted.coeffs[[3]] <- as.numeric(fitted.coeffs[[3]])
-
-fitted.coeffs <- data.table(fitted.coeffs[[1]],
-                            fitted.coeffs[[2]][, .(beta)],
-                            theta=as.numeric(fitted.coeffs[[3]])
-                            )
-fitted.coeffs[, gamma := beta + theta * alpha]
-fitted.coeffs <- fitted.coeffs[, .(alpha=mean(alpha), gamma=mean(gamma)),
-                               by=qtlname]                            
-
-options(warn=1)
-ggplot(fitted.coeffs, aes(x=alpha, y=gamma)) + 
-    geom_point() +
-    ggrepel::geom_text_repel(aes(label=qtlname), force=5, size=2.5, fontface="italic", color="blue") + 
-    geom_abline(slope=mle.theta$Estimate, intercept=0) +
-    scale_x_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) + 
-    scale_y_continuous(limits = c(min(c(fitted.coeffs$gamma, 0)),
-                                  max(c(fitted.coeffs$gamma, 0))),
-                       expand =  expansion(mult = c(0.1, 0.1)))  
-
-options(warn=2)
+## get lp for each model
