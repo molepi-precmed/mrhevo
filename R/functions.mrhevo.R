@@ -134,8 +134,13 @@ weighted.median.boot <- function(alpha_hat, gamma_hat, se.alpha_hat,
 #'
 #' @export
 get_summarystatsforMR <- function(Y, Z, X_u) {
+    ## test if Y is binary
+    y.isbinary <- setequal(length(unique(na.omit(Y))), 2)
+
+    if (!y.isbinary) Y <- scale(Y)
+
     # registerDoParallel(cores=10)
-    YXZ.dt <- data.table(y=Y, Z, X_u)
+    YXZ.dt <- data.table(y=as.vector(Y), Z, X_u)
     ## loop over instruments to fit regression of Y on Z, adjusted for X_u
     ## FIXME: implement a score test or parallelize
     coeffs <- foreach(i = 1:ncol(Z),
@@ -145,9 +150,10 @@ get_summarystatsforMR <- function(Y, Z, X_u) {
         scoreid <- colnames(Z)[i]
         formula.string <- paste0("y ~ ", paste(colnames(X_u), collapse=" + "),
                                  " + ", scoreid)
-        coeff <- summary(glm(data=YXZ.dt,
-                             formula=as.formula(formula.string),
-                             family="binomial"))$coefficients
+        coeff <- summary(glm(
+            data=YXZ.dt,
+            formula=as.formula(formula.string),
+            family=ifelse(y.isbinary, "binomial", "gaussian")))$coefficients
         coeff <- as.data.table(coeff, keep.rownames="variable")
         coeff <- coeff[variable==scoreid]
 
