@@ -25,6 +25,15 @@ The motivation for this work was to develop a method to test formally for causal
 
 To install current development version of the package from GitHub use:
 
+1. For the production version:
+
+```r
+library(devtools)
+devtools::install_github(repo="molepi-precmed/mrhevo", ref="package")
+```
+
+2. For the development version:
+
 ```r
 library(devtools)
 devtools::install_github(repo="molepi-precmed/mrhevo", ref="main")
