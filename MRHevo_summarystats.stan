@@ -19,7 +19,7 @@ data {
   real < lower=0 > slab_df; // slab degrees of freedom for regularized horseshoe
   real < lower=0 > priorsd_theta; // sd of prior on theta
   vector[J] gamma_hat; // estimated coeffs for regression of Y on Z
-  vector <lower=0> [J] sd_gamma_hat; // standard error of estimated coeffs alpha_hat
+  vector <lower=0> [J] sd_gamma_hat; // standard error of estimated coeffs gamma_hat
   vector[J] alpha_hat; // estimated coeffs for effects of Z on X
   vector <lower=0> [J] sd_alpha_hat; // standard error of estimated coeffs alpha_hat
   vector <lower=0> [J] info; // inverse variance of ratio estimator
