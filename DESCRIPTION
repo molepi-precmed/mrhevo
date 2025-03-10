@@ -43,5 +43,5 @@ Suggests:
 LinkingTo: Rcpp, BH, bigmemory, RcppEigen
 ByteCompile: TRUE
 Encoding: UTF-8
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.2
 Config/testthat/edition: 3
