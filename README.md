@@ -39,9 +39,17 @@ library(devtools)
 devtools::install_github(repo="molepi-precmed/mrhevo", ref="main")
 ```
 
-You can then run the example script:
+If you want to run the examples: 
 
 ```r
+## get the source code
+devtools::install_github("molepi-precmed/mrhevo", ref="main", build=FALSE)
+setwd("path/to/local/clone/of/mrhevo")
+
+## load the package
+devtools::load_all()
+
+## run the examples
 devtools::run_examples()
 ```
 
