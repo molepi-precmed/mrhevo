@@ -32,7 +32,7 @@ library(devtools)
 devtools::install_github(repo="molepi-precmed/mrhevo", ref="package")
 ```
 
-2. For the development version:
+2. For the development version (recommended if facing Stan compilation issues):
 
 ```r
 library(devtools)
