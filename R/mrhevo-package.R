@@ -9,7 +9,6 @@
 #' Buddhi Erabadda \email{b.erabadda@@ed.ac.uk},
 #' Athina Spiliopoulou \email{a.spiliopoulou@@ed.ac.uk}
 #'
-#' @docType package
 #' @name mrhevo-package
 #' @aliases mrhevo
 #' @useDynLib mrhevo, .registration = TRUE
@@ -25,7 +24,8 @@
 #' @references
 #' Stan Development Team (NA). RStan: the R interface to Stan. R package version 2.32.3. https://mc-stan.org
 #'
-NULL
+#' @keywords internal
+"_PACKAGE"
 
 .onLoad <- function(libname, pkgname) {
     modules <- paste0("stan_fit4", names(stanmodels), "_mod")

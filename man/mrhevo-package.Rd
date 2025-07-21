@@ -12,9 +12,18 @@ marginalising over distribution of direct effects.
 \references{
 Stan Development Team (NA). RStan: the R interface to Stan. R package version 2.32.3. https://mc-stan.org
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/molepi-precmed/mrhevo}
+  \item Report bugs at \url{https://github.com/molepi-precmed/mrhevo/issues}
+}
+
+}
 \author{
 Paul McKeigue \email{paul.mckeigue@ed.ac.uk},
 Andrii Iakovliev \email{andrii.iakovliev@ed.ac.uk},
 Buddhi Erabadda \email{b.erabadda@ed.ac.uk},
 Athina Spiliopoulou \email{a.spiliopoulou@ed.ac.uk}
 }
+\keyword{internal}
