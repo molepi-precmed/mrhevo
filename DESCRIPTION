@@ -31,12 +31,12 @@ Imports:
     doParallel,
     crayon,
     data.table,
-    matrixStats,
     rstan,
     bayesplot,
     cowplot,
     car,
     ggrepel,
+    ggplot2,
     ggplotify
 Suggests:
     testthat (>= 3.0)

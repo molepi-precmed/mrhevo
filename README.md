@@ -53,6 +53,95 @@ devtools::load_all()
 devtools::run_examples()
 ```
 
+## Example: Using summary statistics
+
+This example demonstrates how to run MR-Hevo using summary statistics only (no individual-level data required).
+
+```r
+library(mrhevo)
+
+## Load example summary statistics dataset (included in package)
+coeffs <- readRDS(system.file("data/coeffs.RDS", package = "mrhevo"))
+
+## Required inputs:
+## - alpha_hat: effect of each instrument on the exposure
+## - se.alpha_hat: standard error of alpha_hat
+## - gamma_hat: effect of each instrument on the outcome  
+## - se.gamma_hat: standard error of gamma_hat
+alpha_hat <- coeffs$alpha_hat
+se.alpha_hat <- coeffs$se.alpha_hat
+gamma_hat <- coeffs$gamma_hat
+se.gamma_hat <- coeffs$se.gamma_hat
+
+cat("Number of genetic instruments:", length(alpha_hat), "\n")
+
+## Path to Stan models (included in package)
+model.dir <- system.file("stan", package = "mrhevo")
+
+## Run MR-Hevo with summary statistics
+## Using default priors: fraction_pleio = 0.5 (prior guess that 50% of instruments are pleiotropic)
+fit <- run_mrhevo.sstats(
+  alpha_hat = alpha_hat,
+  se.alpha_hat = se.alpha_hat,
+  gamma_hat = gamma_hat,
+  se.gamma_hat = se.gamma_hat,
+  fraction_pleio = 0.5,
+  slab_scale = 0.2,
+  priorsd_theta = 1,
+  model.dir = model.dir
+)
+
+## Extract posterior samples
+posterior_samples <- rstan::extract(fit)
+
+## Get posterior summary
+print(summary(fit, pars = "theta")$summary)
+
+## Compute MLE and p-value from posterior
+mle_result <- mle.se.pval(posterior_samples$theta, rep(1, length(posterior_samples$theta)))
+print(mle_result)
+```
+
+### Example results
+
+Running the analysis on the included dataset (`data/coeffs.RDS`) with 43 genetic instruments yields:
+
+**Conventional MR Estimators:**
+
+| Estimator | Estimate | SE | z | p-value |
+|-----------|----------|------|--------|---------|
+| Inverse Variance Weighted (IVW) | -0.300 | 0.0196 | -15.31 | 6.1e-53 |
+
+**MR-Hevo Bayesian Analysis:**
+
+The MR-Hevo model with regularized horseshoe prior on pleiotropic effects provides a posterior distribution for the causal effect. After running the Stan model:
+
+```
+             mean     se_mean        sd       2.5%        50%      97.5%    n_eff    Rhat
+theta     -0.337     0.0014    0.051     -0.436     -0.338     -0.233    1390     1.00
+```
+
+**MLE from posterior:**
+
+```
+   Estimate      SE        z    pvalue pvalue.formatted
+1:  -0.326  0.0578 -5.652 1.58e-08           2e-08
+```
+
+The MR-Hevo analysis gives a posterior mean estimate of **-0.337** (95% CI: -0.436 to -0.233), indicating a strong causal effect of the exposure on the outcome. The MLE p-value of 1.6e-08 provides strong evidence for a causal effect, consistent with the conventional IVW estimator but with appropriate uncertainty quantification that accounts for potential pleiotropy.
+
+### Interpreting the results
+
+- **Posterior distribution**: The `theta` parameter represents the causal effect of the exposure on the outcome
+- **MLE and p-value**: The `mle.se.pval()` function computes a maximum likelihood estimate and associated p-value by fitting a quadratic approximation to the log-posterior
+- **Conventional MR estimators**: For comparison, the package also computes inverse-variance weighted (IVW), weighted median, and penalized weighted median estimators
+
+### Choosing prior parameters
+
+- `fraction_pleio`: Prior guess for the proportion of instruments with pleiotropic effects (0.05 to 0.95). Default is 0.5.
+- `slab_scale`: Scale parameter for the regularized horseshoe slab component. Default is 0.2.
+- `priorsd_theta`: Prior standard deviation for the causal effect theta. Default is 1 (weakly informative).
+
 ## Troubleshooting
 
 This package is in early beta testing and things can go wrong! Proceed with caution.

@@ -55,7 +55,7 @@ format.scinot.pvalue <- function(x) {
     ## split x.split at E
     x.split <- as.numeric(unlist(strsplit(as.character(x), "E")))
     ## 1 significant figure
-    x.split <- signif(as.numeric(x.split, 1))
+    x.split <- signif(as.numeric(x.split), 1)
     x.split <- t(matrix(x.split, nrow=2))
     ## handle cases where mantissa is rounded up to 10
     roundedto10 <- x.split[, 1]==10
@@ -96,31 +96,6 @@ format.z.aspvalue <- function(z, sigfig=1, neglogp.threshold.scinot=3,
     ## format values in scientific notation for LaTeX
     p.char[grep("E", p.char)] <- format.scinot.pvalue(p.char[grep("E", p.char)])
     return(p.char)
-}
-
-#' Bootstrap standard error for weighted median estimate of ratio of gamma to
-#' alpha, where gamma and alpha are independent Gaussian variates with
-#' estimates gamma_hat, alpha_hat and respective standard errors se.gamma_hat,
-#' se.alpha_hat.
-#'
-#' @param alpha_hat Estimate of Gaussian alpha.
-#' @param gamma_hat Estimate of Gaussian gamma.
-#' @param se.alpha_hat Standard error of Gaussian alpha.
-#' @param se.gamma_hat Standard error of Gaussian gamma.
-#'
-#' @return Standard error of weighted median estimate.
-weighted.median.boot <- function(alpha_hat, gamma_hat, se.alpha_hat,
-                                 se.gamma_hat, weights) {
-    med = numeric(1000)
-    for (i in 1:1000) {
-        alpha_hat.boot = rnorm(length(alpha_hat), mean=alpha_hat,
-                               sd=se.alpha_hat)
-        gamma_hat.boot = rnorm(length(gamma_hat), mean=gamma_hat,
-                               sd=se.gamma_hat)
-        betaIV.boot = gamma_hat.boot / alpha_hat.boot
-        med[i] = matrixStats::weightedMedian(betaIV.boot, weights)
-    }
-    return(sd(med))
 }
 
 #' Calculate summary stats for second step of two-step Mendelian randomization.
@@ -181,7 +156,7 @@ get_coeffratios <- function(coeffs.dt, use.delta=FALSE) {
     return(coeffs.dt)
 }
 
-#' Calculate conventional MR estimators from summary stats.
+#' Calculate inverse-variance weighted MR estimator from summary stats.
 #'
 #' @param coeffs.dt Data.table with columns for coefficient and SE of
 #'                  regression of exposure on instrument: \code{alpha_hat},
@@ -189,45 +164,16 @@ get_coeffratios <- function(coeffs.dt, use.delta=FALSE) {
 #'                  regression of outcome on instrument: \code{gamma_hat},
 #'                  \code{se.gamma_hat} and coefficient ratios:
 #'                  \code{theta_IV}, \code{se.theta_IV}.
-#' @return A data.table of estimates for weighted mean, weighted median, and
-#'         penalized weighted median of instrumental variable estimates.
+#' @return A data.table with inverse-variance weighted estimate.
 #'
-#' @note Details on penalized weighted median estimator can be found in
-#'       Bowden J, Davey Smith G, Haycock PC, Burgess S. Consistent Estimation
-#'       in Mendelian Randomization with Some Invalid Instruments Using a
-#'       Weighted Median Estimator. Genet Epidemiol. 2016 May;40(4):304-14.
-#'       doi: 10.1002/gepi.21965. Epub 2016 Apr 7. PMID: 27061298;
-#'       PMCID: PMC4849733.
-#'
-#' @import matrixStats
 #' @export
 get_estimatorsMR <- function(coeffs.dt) {
-    ## IVW estimator
     theta_IVW <- coeffs.dt[, sum(theta_IV * inv.var) / sum(inv.var)]
     se.theta_IVW  <- coeffs.dt[, sqrt(1 / sum(inv.var))]
 
-    ## weighted median estimator
-    thetaWM <- coeffs.dt[, matrixStats::weightedMedian(x=theta_IV, w=inv.var)]
-    se.thetaWM <- coeffs.dt[, weighted.median.boot(alpha_hat, gamma_hat,
-                                                   se.alpha_hat, se.gamma_hat,
-                                                   inv.var)]
-
-    ## penalized weighted median estimator
-    coeffs.dt[, penalty := pchisq(inv.var * (theta_IV - theta_IVW)^2, df=1,
-                                  lower.tail=FALSE)]
-    ## Bowden et al use 20 instead of 20 * .N
-    ## which is equivalent to ignoring penalty where pchisq > .05
-    coeffs.dt[, penalized.weights := inv.var * pmin(1, penalty * 20 *.N)]
-    thetaPWM <- coeffs.dt[, matrixStats::weightedMedian(x=theta_IV,
-                                                        w=penalized.weights)]
-    se.thetaPWM <- coeffs.dt[, weighted.median.boot(alpha_hat, gamma_hat,
-                                                    se.alpha_hat, se.gamma_hat,
-                                                    penalized.weights)]
-
-    estimators.dt <- data.table(Estimator=c("Weighted mean", "Weighted median",
-                                            "Penalized weighted median"),
-                                Estimate=c(theta_IVW, thetaWM, thetaPWM),
-                                SE=c(se.theta_IVW, se.thetaWM, se.thetaPWM))
+    estimators.dt <- data.table(Estimator="Inverse variance weighted",
+                                Estimate=theta_IVW,
+                                SE=se.theta_IVW)
     estimators.dt[, z := Estimate / SE]
     estimators.dt[, pvalue := 2 * pnorm(-abs(z))]
     estimators.dt[, pvalue.formatted := format.z.aspvalue(z)]
