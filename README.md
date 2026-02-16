@@ -100,6 +100,11 @@ print(summary(fit, pars = "theta")$summary)
 ## Compute MLE and p-value from posterior
 mle_result <- mle.se.pval(posterior_samples$theta, rep(1, length(posterior_samples$theta)))
 print(mle_result)
+
+## Plot IV estimates with MLE as slope line through origin
+theta_mle <- mle_result$Estimate
+p <- plot_iv_estimates(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta_mle)
+print(p)
 ```
 
 ### Example results
@@ -130,11 +135,15 @@ theta     -0.337     0.0014    0.051     -0.436     -0.338     -0.233    1390   
 
 The MR-Hevo analysis gives a posterior mean estimate of **-0.337** (95% CI: -0.436 to -0.233), indicating a strong causal effect of the exposure on the outcome. The MLE p-value of 1.6e-08 provides strong evidence for a causal effect, consistent with the conventional IVW estimator but with appropriate uncertainty quantification that accounts for potential pleiotropy.
 
+**Plot of IV estimates:**
+
+![IV estimates with MLE slope](./iv_estimates_plot.png)
+
 ### Interpreting the results
 
 - **Posterior distribution**: The `theta` parameter represents the causal effect of the exposure on the outcome
 - **MLE and p-value**: The `mle.se.pval()` function computes a maximum likelihood estimate and associated p-value by fitting a quadratic approximation to the log-posterior
-- **Conventional MR estimators**: For comparison, the package also computes inverse-variance weighted (IVW), weighted median, and penalized weighted median estimators
+- **Conventional MR estimators**: For comparison, the package also computes the inverse-variance weighted (IVW) estimator
 
 ### Choosing prior parameters
 

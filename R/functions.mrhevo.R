@@ -565,3 +565,52 @@ set.tau0 <- function(fraction_pleio=NULL, nu_global=1, J, info) {
     tau0 <- (r_pleio / (J - r_pleio)) / sqrt(info)
     return(tau0)
 }
+
+#' Plot instrumental variable estimates with MLE as slope line.
+#'
+#' @param alpha_hat Vector of estimated coefficients for effect of instruments
+#'        on exposure.
+#' @param se.alpha_hat Vector of standard errors for coefficients alpha_hat.
+#' @param gamma_hat Vector of estimated coefficients for effect of instruments
+#'        on outcome.
+#' @param se.gamma_hat Vector of standard errors for coefficients gamma_hat.
+#' @param theta Maximum likelihood estimate of causal effect (slope).
+#'
+#' @return A ggplot object showing IV estimates with MLE as line through origin.
+#'
+#' @import ggplot2 data.table
+#' @export
+plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta) {
+    theta_IV <- gamma_hat / alpha_hat
+    se.theta_IV <- se.gamma_hat / abs(alpha_hat)
+
+    iv.dt <- data.table(
+        alpha_hat = alpha_hat,
+        gamma_hat = gamma_hat,
+        theta_IV = theta_IV,
+        se.theta_IV = se.theta_IV
+    )
+
+    x_range <- range(iv.dt$alpha_hat)
+    x_line <- seq(x_range[1], x_range[2], length.out = 100)
+    y_line <- theta * x_line
+
+    p <- ggplot(iv.dt, aes(x = alpha_hat, y = gamma_hat)) +
+        geom_point(size = 3, alpha = 0.7) +
+        geom_errorbar(aes(ymin = gamma_hat - 1.96 * se.gamma_hat,
+                         ymax = gamma_hat + 1.96 * se.gamma_hat),
+                     alpha = 0.5) +
+        geom_line(data = data.frame(x = x_line, y = y_line),
+                 aes(x = x, y = y),
+                 color = "red", linewidth = 1.5,
+                 linetype = "dashed") +
+        geom_abline(intercept = 0, slope = theta,
+                   color = "red", linewidth = 1.5, linetype = "dashed") +
+        xlab("Effect of instrument on exposure (alpha)") +
+        ylab("Effect of instrument on outcome (gamma)") +
+        ggtitle(paste0("IV estimates with MLE slope = ", round(theta, 3))) +
+        theme_bw() +
+        theme(legend.position = "none")
+
+    return(p)
+}
