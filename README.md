@@ -107,6 +107,14 @@ print(p)
 ## Plot log-likelihood function with quadratic approximation
 p_loglik <- mle.se.pval(posterior_samples$theta, rep(1, length(posterior_samples$theta)), return.asplot=TRUE)
 print(p_loglik)
+
+## Plot pairs of posterior samples (f, log_c, lp__)
+p_pairs <- plot_posterior_pairs(fit, c('f', 'log_c'))
+print(p_pairs)
+
+## Plot histogram of kappa shrinkage coefficients
+p_kappa <- plot_kappa_hist(fit, num_bins = 50)
+print(p_kappa)
 ```
 
 ### Example results
@@ -128,6 +136,19 @@ The MR-Hevo model with regularized horseshoe prior on pleiotropic effects provid
 theta     -0.337     0.0014    0.051     -0.436     -0.338     -0.233    1390     1.00
 ```
 
+**Plot of log-likelihood:**
+
+![Log-likelihood plot](./loglik_plot.png)
+
+
+**Pairs plot of posterior samples:**
+
+![Posterior pairs plot](./posterior_pairs_plot.png)
+
+**Histogram of kappa shrinkage coefficients:**
+
+![Kappa histogram](./kappa_hist_plot.png)
+
 **MLE from posterior:**
 
 ```
@@ -135,15 +156,7 @@ theta     -0.337     0.0014    0.051     -0.436     -0.338     -0.233    1390   
 1:  -0.326  0.0578 -5.652 1.58e-08           2e-08
 ```
 
-The MR-Hevo analysis gives a posterior mean estimate of **-0.337** (95% CI: -0.436 to -0.233), indicating a strong causal effect of the exposure on the outcome. The MLE p-value of 1.6e-08 provides strong evidence for a causal effect, consistent with the conventional IVW estimator but with appropriate uncertainty quantification that accounts for potential pleiotropy.
-
-**Plot of IV estimates:**
-
-![IV estimates with MLE slope](./iv_estimates_plot.png)
-
-**Plot of log-likelihood:**
-
-![Log-likelihood plot](./loglik_plot.png)
+The results support a causal (inverse) effect of the exposure on the outcome. The posterior distribution of the causal effect parameter `theta` is approximately Gaussian, and the log-likelihood function, obtained by dividing the posterior by the prior and taking logarithms, is approximately quadratic.  As the prior is relatively weak, the maximum likelihood value of the causal effect parameter is close to the posterior mean.  
 
 ### Interpreting the results
 
@@ -151,9 +164,18 @@ The MR-Hevo analysis gives a posterior mean estimate of **-0.337** (95% CI: -0.4
 - **MLE and p-value**: The `mle.se.pval()` function computes a maximum likelihood estimate and associated p-value by fitting a quadratic approximation to the log-posterior
 - **Conventional MR estimators**: For comparison, the package also computes the inverse-variance weighted (IVW) estimator.  Some other widely-used MR estimators, notably the weighted median estimator and the "outlier-corrected" MR-PRESSO estimator, are incorrect and should not be used. 
 
+
+**Plot of effects of instruments on outcome against effects on exposure**
+
+A scatter plot of the effects of the effects of the instruments on the outcome against their effects on exposure helps with interpretation.  The _CDH13_ locus is an outlier, and this has a plausible biologic explanation.  
+
+
+![IV estimates with MLE slope](./iv_estimates_plot.png)
+
+
 ### Choosing prior parameters
 
-- `fraction_pleio`: Prior guess for the proportion of instruments with pleiotropic effects (0.05 to 0.95). Default is 0.5.
+- `fraction_pleio`: Prior guess for the proportion of instruments with pleiotropic effects (0.05 to 0.95). Default is 0.5.  With the current version of the program, the global shrinkage parameter is fixed at 10^-6^ and this setting has no effect. 
 - `slab_scale`: Scale parameter for the regularized horseshoe slab component. Default is 0.2.
 - `priorsd_theta`: Prior standard deviation for the causal effect theta. Default is 1 (weakly informative).
 
