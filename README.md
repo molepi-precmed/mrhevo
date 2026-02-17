@@ -4,17 +4,15 @@ Mendelian randomization has been widely used to study causal effects of exposure
 
 Inference of causal effects can be tackled like any other statistical problem, by computing the likelihood (or posterior distribution) of the parameter of interest (the causal effect) while marginalizing over the distribution of nuisance variables (in this case the pleiotropic effects).  If we can compute the posterior distribution of the parameter of interest, we can obtain the likelihood by dividing by the prior on that parameter.
 
-As the form of the distribution of pleiotropic effects over loci is unknown, any realistic statistical model has to specify a prior that encompassses a broad family of symmetric distributions ranging from a spike-and-slab to a Gaussian.  An initial implementation of this approach has been been described by [Berzuini et al (2020)](https://doi.org/10.1093/biostatistics/kxy027).  They specify a horseshoe prior for the pleiotropic effects, and generate the posterior distribution of all model parameters, including the causal effect parameter, by Markov chain Monte Carlo sampling.  An implementation that uses only summary statistics has been described by [Grant and Burgess (2020)](https://www.biorxiv.org/content/10.1101/2023.05.30.542988v1)
+As the form of the distribution of pleiotropic effects over loci is unknown, any realistic statistical model has to specify a prior that encompassses a broad family of symmetric distributions ranging from a spike-and-slab to a Gaussian.  An initial implementation of this approach has been been described by [Berzuini et al (2020)](https://doi.org/10.1093/biostatistics/kxy027).  They specify a horseshoe prior for the pleiotropic effects, and generate the posterior distribution of all model parameters, including the causal effect parameter, by Markov chain Monte Carlo sampling.  An implementation that uses only summary statistics has been described by [Grant and Burgess (2023)](https://doi.org/10.1016/j.ajhg.2023.12.002) as "MR-HORSE.  The methods used in this package differ from MR-HORSE in that: 
 
-This method extends the likelihood-based approach
+1. The model specifies a regularized horseshoe prior on shrinkage coefficients, as described by [Piironen and Vehtari (2017)](https://doi.org/10.1214/17-EJS1337SI).  This prior, known as the "Finnish horseshoe", has better computational properties than the original horseshoe.  On this basis, the method is named `MR-Hevo` (hevo is Finnish for a horse).
 
-1. to two-step Mendelian randomization, where step 1 uses only summary statistics for the effects of genetic instruments on exposure, and step 2 uses individual-level data to test the effects of these instruments on the outcome.
+2. The package uses the NUTS (No U-Turn Sampler) algorithm to sample the posterior.  This is implemented using `Stan` (by default) or `NumPyro`.  
 
-2. to use a regularized horseshoe prior on shrinkage coefficients, as described by [Piironen and Vehtari (2017)](https://doi.org/10.1214/17-EJS1337SI).  This prior, known as the "Finnish horseshoe", has better computational properties than the original horseshoe.  On this basis, the method is named `MR-Hevo` (hevo is Finnish for a horse).
+3. The marginal likelihood of the causal effect parameter is computed from the posterior and the prior, yielding classical maximum likelihood estimates and _p_-values for the causal effect.
 
-3. to generate classical maximum likelihood estimates and _p_-values for the causal effect.
-
-The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are clumps of SNPs with trans- effects on the expression of a gene as transcript or circulating protein.
+The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are scalar variables calculated from clumps of SNPs that have _trans_- effects on the expression of a gene as transcript or circulating protein.
 
 ## Guide
 
@@ -55,9 +53,9 @@ devtools::run_examples()
 
 ## Example: Using summary statistics
 
-This example demonstrates how to run MR-Hevo using summary statistics only (no individual-level data required).
+This example demonstrates how to run MR-Hevo using summary statistics only (no individual-level data required).  In the example dataset, the outcome variable is type 2 diabetes and the exposure is plasma levels of adiponectin (encoded by _ADIPOQ_).  The instruments are 43 scalar _trans_-QTLs for adiponectin levels.  
 
-```r
+```r 
 library(mrhevo)
 
 ## Load example summary statistics dataset (included in package)
@@ -151,7 +149,7 @@ The MR-Hevo analysis gives a posterior mean estimate of **-0.337** (95% CI: -0.4
 
 - **Posterior distribution**: The `theta` parameter represents the causal effect of the exposure on the outcome
 - **MLE and p-value**: The `mle.se.pval()` function computes a maximum likelihood estimate and associated p-value by fitting a quadratic approximation to the log-posterior
-- **Conventional MR estimators**: For comparison, the package also computes the inverse-variance weighted (IVW) estimator
+- **Conventional MR estimators**: For comparison, the package also computes the inverse-variance weighted (IVW) estimator.  Some other widely-used MR estimators, notably the weighted median estimator and the "outlier-corrected" MR-PRESSO estimator, are incorrect and should not be used. 
 
 ### Choosing prior parameters
 
