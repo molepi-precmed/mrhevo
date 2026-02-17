@@ -618,56 +618,51 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
 #' Plot pairs of posterior samples.
 #'
 #' @param fit Stan fit object.
-#' @param pars Vector of parameter names to plot.
+#' @param pars Vector of parameter names to plot (default c("f", "log_c", "log_tau")).
 #'
 #' @return A ggplot object showing pairs plot.
 #'
 #' @import bayesplot ggplot2
 #' @export
-plot_posterior_pairs <- function(fit, pars = c("f", "log_c")) {
-    posterior <- rstan::extract(fit, pars = pars)
+plot_posterior_pairs <- function(fit, pars = c("f", "log_c", "log_tau")) {
+    # Get NUTS parameters including divergent transitions
+    np <- bayesplot::nuts_params(fit, type = "divergent")
 
-    # Get log probability as proxy for energy if needed
-    lp <- rstan::extract(fit, pars = "lp__")$lp__
-
-    # Create data frame for plotting
-    plot_data <- data.table::data.table(
-        f = posterior$f,
-        log_c = posterior$log_c,
-        lp = lp
-    )
-
-    # Use bayesplot mcmc_pairs - need to convert to array format
-    # Combine into a 3D array: chains x iterations x parameters
-    np <- bayesplot::nuts_params(fit)
-
-    # Try bayesplot pairs with the fit object directly
+    # Create pairs plot with diverging transitions highlighted
     p <- bayesplot::mcmc_pairs(fit, pars = pars,
-                               off_diag_args = list(size = 0.5))
+                               np = np,
+                               off_diag_args = list(size = 0.5, alpha = 0.3),
+                               diag_args = list(size = 1))
+
+    # Increase text size
+    p <- p + ggplot2::theme_bw() + ggplot2::theme(text = ggplot2::element_text(size = 14))
+
     return(p)
 }
 
 #' Plot histogram of kappa shrinkage coefficients.
 #'
 #' @param fit Stan fit object.
-#' @param num_bins Number of bins for histogram (default 50).
+#' @param bin_width Width of bins for histogram (default 0.02).
 #'
 #' @return A ggplot object showing histogram of kappa values.
 #'
 #' @import ggplot2
 #' @export
-plot_kappa_hist <- function(fit, num_bins = 50) {
+plot_kappa_hist <- function(fit, bin_width = 0.02) {
     posterior <- rstan::extract(fit)
     kappa <- posterior$kappa
 
     kappa_vec <- as.vector(kappa)
     kappa_dt <- data.table::data.table(kappa = kappa_vec)
 
-    p <- ggplot(kappa_dt, aes(x = kappa)) +
-        geom_histogram(bins = num_bins, fill = "steelblue", color = "white") +
+    p <- ggplot(kappa_dt, aes(x = kappa, y = after_stat(density))) +
+        geom_histogram(binwidth = bin_width, fill = "steelblue", color = "white",
+                       boundary = 0) +
+        scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
         xlab("Kappa (shrinkage coefficient)") +
-        ylab("Count") +
-        ggtitle(paste("Histogram of kappa (", num_bins, "bins)")) +
+        ylab("Proportion") +
+        ggtitle(paste("Histogram of kappa (bin width =", bin_width, ")")) +
         theme_bw() +
         theme(legend.position = "none")
 

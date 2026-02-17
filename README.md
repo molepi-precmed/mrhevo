@@ -108,12 +108,12 @@ print(p)
 p_loglik <- mle.se.pval(posterior_samples$theta, rep(1, length(posterior_samples$theta)), return.asplot=TRUE)
 print(p_loglik)
 
-## Plot pairs of posterior samples (f, log_c, lp__)
-p_pairs <- plot_posterior_pairs(fit, c('f', 'log_c'))
+## Plot pairs of posterior samples (f, log_c, log_tau)
+p_pairs <- plot_posterior_pairs(fit)
 print(p_pairs)
 
-## Plot histogram of kappa shrinkage coefficients
-p_kappa <- plot_kappa_hist(fit, num_bins = 50)
+## Plot histogram of kappa shrinkage coefficients (bin width 0.02, proportion)
+p_kappa <- plot_kappa_hist(fit, bin_width = 0.02)
 print(p_kappa)
 ```
 
@@ -138,16 +138,15 @@ theta     -0.337     0.0014    0.051     -0.436     -0.338     -0.233    1390   
 
 **Plot of log-likelihood:**
 
-![Log-likelihood plot](./loglik_plot.png)
-
+<img src="./loglik_plot.png" width="500" />
 
 **Pairs plot of posterior samples:**
 
-![Posterior pairs plot](./posterior_pairs_plot.png)
+<img src="./posterior_pairs_plot.png" width="500" />
 
 **Histogram of kappa shrinkage coefficients:**
 
-![Kappa histogram](./kappa_hist_plot.png)
+<img src="./kappa_hist_plot.png" width="500" />
 
 **MLE from posterior:**
 
@@ -175,7 +174,7 @@ A scatter plot of the effects of the effects of the instruments on the outcome a
 
 ### Choosing prior parameters
 
-- `fraction_pleio`: Prior guess for the proportion of instruments with pleiotropic effects (0.05 to 0.95). Default is 0.5.  With the current version of the program, the global shrinkage parameter is fixed at 10^-6^ and this setting has no effect. 
+- `fraction_pleio`: Prior guess for the proportion of instruments with pleiotropic effects (0.05 to 0.95). Default is 0.5.  
 - `slab_scale`: Scale parameter for the regularized horseshoe slab component. Default is 0.2.
 - `priorsd_theta`: Prior standard deviation for the causal effect theta. Default is 1 (weakly informative).
 
