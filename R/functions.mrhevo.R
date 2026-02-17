@@ -631,11 +631,10 @@ plot_posterior_pairs <- function(fit, pars = c("f", "log_c", "log_tau")) {
     # Create pairs plot with diverging transitions highlighted
     p <- bayesplot::mcmc_pairs(fit, pars = pars,
                                np = np,
-                               off_diag_args = list(size = 0.5, alpha = 0.3),
-                               diag_args = list(size = 1))
+                               off_diag_args = list(alpha = 0.3))
 
     # Increase text size
-    p <- p + ggplot2::theme_bw() + ggplot2::theme(text = ggplot2::element_text(size = 14))
+    p <- p + ggplot2::theme_bw() + ggplot2::theme(text = ggplot2::element_text(size = 18))
 
     return(p)
 }
