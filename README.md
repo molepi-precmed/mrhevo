@@ -105,6 +105,10 @@ print(mle_result)
 theta_mle <- mle_result$Estimate
 p <- plot_iv_estimates(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta_mle, coeffs$qtlname)
 print(p)
+
+## Plot log-likelihood function with quadratic approximation
+p_loglik <- mle.se.pval(posterior_samples$theta, rep(1, length(posterior_samples$theta)), return.asplot=TRUE)
+print(p_loglik)
 ```
 
 ### Example results
@@ -138,6 +142,10 @@ The MR-Hevo analysis gives a posterior mean estimate of **-0.337** (95% CI: -0.4
 **Plot of IV estimates:**
 
 ![IV estimates with MLE slope](./iv_estimates_plot.png)
+
+**Plot of log-likelihood:**
+
+![Log-likelihood plot](./loglik_plot.png)
 
 ### Interpreting the results
 
