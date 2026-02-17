@@ -575,12 +575,13 @@ set.tau0 <- function(fraction_pleio=NULL, nu_global=1, J, info) {
 #'        on outcome.
 #' @param se.gamma_hat Vector of standard errors for coefficients gamma_hat.
 #' @param theta Maximum likelihood estimate of causal effect (slope).
+#' @param qtlname Optional vector of QTL names for labeling points.
 #'
 #' @return A ggplot object showing IV estimates with MLE as line through origin.
 #'
-#' @import ggplot2 data.table
+#' @import ggplot2 data.table ggrepel
 #' @export
-plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta) {
+plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta, qtlname = NULL) {
     theta_IV <- gamma_hat / alpha_hat
     se.theta_IV <- se.gamma_hat / abs(alpha_hat)
 
@@ -591,11 +592,14 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
         se.theta_IV = se.theta_IV
     )
 
+    if (!is.null(qtlname)) {
+        iv.dt[, qtlname := qtlname]
+    }
+
     p <- ggplot(iv.dt, aes(x = alpha_hat, y = gamma_hat)) +
         geom_point(size = 3, alpha = 0.7) +
-        geom_errorbar(aes(ymin = gamma_hat - 1.96 * se.gamma_hat,
-                         ymax = gamma_hat + 1.96 * se.gamma_hat),
-                     alpha = 0.5) +
+        geom_hline(yintercept = 0, color = "black", linewidth = 0.5) +
+        geom_vline(xintercept = 0, color = "black", linewidth = 0.5) +
         geom_abline(intercept = 0, slope = theta,
                    color = "red", linewidth = 0.8, linetype = "dashed") +
         xlab("Effect of instrument on exposure (alpha)") +
@@ -603,6 +607,10 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
         scale_x_continuous(limits = c(0, NA)) +
         theme_bw() +
         theme(legend.position = "none")
+
+    if (!is.null(qtlname)) {
+        p <- p + geom_text_repel(aes(label = qtlname), size = 2.5, max.overlaps = 20)
+    }
 
     return(p)
 }

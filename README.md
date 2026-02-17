@@ -103,7 +103,7 @@ print(mle_result)
 
 ## Plot IV estimates with MLE as slope line through origin
 theta_mle <- mle_result$Estimate
-p <- plot_iv_estimates(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta_mle)
+p <- plot_iv_estimates(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta_mle, coeffs$qtlname)
 print(p)
 ```
 
