@@ -8,7 +8,7 @@ As the form of the distribution of pleiotropic effects over loci is unknown, any
 
 1. The model specifies a regularized horseshoe prior on shrinkage coefficients, as described by [Piironen and Vehtari (2017)](https://doi.org/10.1214/17-EJS1337SI).  This prior, known as the "Finnish horseshoe", has better computational properties than the original horseshoe.  On this basis, the method is named `MR-Hevo` (hevo is Finnish for a horse).
 
-2. The package uses the NUTS (No U-Turn Sampler) algorithm to sample the posterior.  This is implemented using `Stan` (by default) or `NumPyro`.  
+2. The package uses the NUTS (No U-Turn Sampler) algorithm to sample the posterior.  This is implemented using `NumPyro` (by default) or `Stan`. 
 
 3. The marginal likelihood of the causal effect parameter is computed from the posterior and the prior, yielding classical maximum likelihood estimates and _p_-values for the causal effect.
 
@@ -20,20 +20,11 @@ The motivation for this work was to develop a method to test formally for causal
 
 ## Installation
 
-To install current development version of the package from GitHub use:
-
-1. For the production version:
+To install current version of the package from GitHub use:
 
 ```r
 library(devtools)
-devtools::install_github(repo="molepi-precmed/mrhevo", ref="package")
-```
-
-2. For the development version (recommended if facing Stan compilation issues):
-
-```r
-library(devtools)
-devtools::install_github(repo="molepi-precmed/mrhevo", ref="main")
+devtools::install_github(repo="molepi-precmed/mrhevo")
 ```
 
 If you want to run the examples: 
@@ -54,7 +45,7 @@ devtools::run_examples()
 
 This example demonstrates how to run MR-Hevo using summary statistics only (no individual-level data required). In the example dataset, the outcome variable is type 2 diabetes and the exposure is plasma levels of adiponectin (encoded by _ADIPOQ_). The instruments are 43 scalar _trans_-QTLs for adiponectin levels.
 
-The **default implementation** uses NumPyro (Python-based MCMC) via the reticulate package, which is approximately 4x faster than Stan. The Stan implementation gives very similar results.
+The default implementation uses NumPyro (Python-based MCMC) via the reticulate package, which is approximately 4x faster than Stan. The Stan implementation gives very similar results.
 
 ```r
 library(mrhevo)
@@ -159,17 +150,7 @@ NumPyro is approximately **4x faster** than Stan for this dataset while producin
 
 ### Example results
 
-Running the analysis on the included dataset (`data/coeffs.RDS`) with 43 genetic instruments yields:
-
-**Conventional MR Estimators:**
-
-| Estimator | Estimate | SE | z | p-value |
-|-----------|----------|------|--------|---------|
-| Inverse Variance Weighted (IVW) | -0.300 | 0.0196 | -15.31 | 6.1e-53 |
-
-**MR-Hevo Bayesian Analysis:**
-
-The MR-Hevo model with regularized horseshoe prior on pleiotropic effects provides a posterior distribution for the causal effect. After running the Stan model:
+Running the analysis on the included dataset (`data/coeffs.RDS`) with 43 genetic instruments yields a posterior distribution for the causal effect. 
 
 ```
              mean     se_mean        sd       2.5%        50%      97.5%    n_eff    Rhat
@@ -195,18 +176,17 @@ theta     -0.337     0.0014    0.051     -0.436     -0.338     -0.233    1390   
 1:  -0.326  0.0578 -5.652 1.58e-08           2e-08
 ```
 
-The results support a causal (inverse) effect of the exposure on the outcome. The posterior distribution of the causal effect parameter `theta` is approximately Gaussian, and the log-likelihood function, obtained by dividing the posterior by the prior and taking logarithms, is approximately quadratic.  As the prior is relatively weak, the maximum likelihood value of the causal effect parameter is close to the posterior mean.  
+The posterior distribution of the causal effect parameter `theta` is approximately Gaussian, and the log-likelihood function, obtained by dividing the posterior by the prior and taking logarithms, is approximately quadratic.  As the prior is relatively weak, the maximum likelihood value of the causal effect parameter is close to the posterior mean.  
 
 ### Interpreting the results
 
 - **Posterior distribution**: The `theta` parameter represents the causal effect of the exposure on the outcome
 - **MLE and p-value**: The `mle.se.pval()` function computes a maximum likelihood estimate and associated p-value by fitting a quadratic approximation to the log-posterior
-- **Conventional MR estimators**: For comparison, the package also computes the inverse-variance weighted (IVW) estimator.  Some other widely-used MR estimators, notably the weighted median estimator and the "outlier-corrected" MR-PRESSO estimator, are incorrect and should not be used. 
+- **Conventional MR estimators**: The inverse-variance weighted (IVW) estimator assumes no direct (pleiotropic) effects of the instruments on the outcome.  As most genetic variants have pleiotropic effects, this assumption is unlikely to hold.  Some other widely-used MR estimators, notably the weighted median estimator and the "outlier-corrected" MR-PRESSO estimator, are incorrect and should not be used.  The random-effects IVW estimator assumes a that the direct effects have a Gaussian distribution over the instruments.  Where the direct effects have a distribution that is more heavy-tailed than a Gaussian, a test based on the random-effects IVW estimator may give reasonable control of the error rate but has less statistical power than the test based on the marginal likelihood. 
 
+The results on this example dataset support a causal (inverse) effect of the exposure (adiponectin levels) on the outcome (type 2 diabetes). 
 
-**Plot of effects of instruments on outcome against effects on exposure**
-
-A scatter plot of the effects of the effects of the instruments on the outcome against their effects on exposure helps with interpretation.  The _CDH13_ locus is an outlier, and this has a plausible biologic explanation.  
+A scatter plot of the effects of the effects of the instruments on the outcome against their effects on exposure helps with interpretation.  The _CDH13_ locus is an outlier, and this has a plausible biologic explanation: CDH13 is required for adiponectin to enter the cell, so deficient expression of _CDH13_ reduces the bioavailability of adiponectin but increases plasma levels because the adiponectin accumulates in plasma. 
 
 
 ![IV estimates with MLE slope](./iv_estimates_plot.png)
@@ -220,7 +200,7 @@ A scatter plot of the effects of the effects of the instruments on the outcome a
 
 ## Troubleshooting
 
-This package is in early beta testing and things can go wrong! Proceed with caution.
+This package was tested on Ubuntu 24.10 with `gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.2)` and R4.3. This package has not been tested on MacOS or Windows.  Please notify us of any problems. 
 
 Here we have listed some common errors that you may experience when installing or using the package. Please note this list is not exhaustive.
 
@@ -228,7 +208,7 @@ Here we have listed some common errors that you may experience when installing o
 
  `error in sink(type = "output") : invalid connection`
 
-This is a Stan error related to system `/tmp` directory being not writable. This is a common case on HPC systems and linux servers.
+This error is related to system `/tmp` directory being not writable. This is a common case on HPC systems and linux servers.
 
 * It is recommended to create a temporary directory in user's home directory (e.g. `/home/$USER/tmp`) and point R to it by creating `~/.Renviron` file with the following content:
 
@@ -238,10 +218,6 @@ This is a Stan error related to system `/tmp` directory being not writable. This
     TEMP=/home/<username>/tmp
   ```
 
-### Stan cannot compile the model
-
-* Rare Stan errors related to C compiler were also reported by users. This package was tested on Ubuntu 20.04 with `gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.2)` and R4.3. This package was not tested on MacOS or Windows. In case of any errors related to compilation of Stan models refer to Stan and Rstan documentation, help and troubleshooting guides.
-* We noted that specifying custom C++ compilers and flags in `Makevars` often leads to errors, hence, refer to Stan and Rstan documentation if you need to use custom compilers and proceed with caution.
 
 # Copyright
 
