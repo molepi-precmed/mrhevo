@@ -635,13 +635,13 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
 #' Plot pairs of posterior samples.
 #'
 #' @param fit Stan fit object or mrhevo_numpyro object.
-#' @param pars Vector of parameter names to plot (default c("theta", "f", "log_tau")).
+#' @param pars Vector of parameter names to plot (default c("log_tau", "log_eta", "f")).
 #'
 #' @return A ggplot object showing pairs plot.
 #'
 #' @import bayesplot ggplot2 cowplot
 #' @export
-plot_posterior_pairs <- function(fit, pars = c("theta", "f", "log_tau")) {
+plot_posterior_pairs <- function(fit, pars = c("log_tau", "log_eta", "f")) {
     if (inherits(fit, "mrhevo_numpyro")) {
         # NumPyro output - extract directly from posterior list
         post <- fit$posterior
@@ -674,20 +674,20 @@ plot_posterior_pairs <- function(fit, pars = c("theta", "f", "log_tau")) {
                     p_ij <- ggplot(df_plot, aes(x = .data[[names(df_plot)[i]]])) +
                         geom_histogram(fill = "steelblue", color = "white", bins = 30) +
                         ggplot2::theme_bw() +
-                        ggplot2::theme(text = ggplot2::element_text(size = 8))
+                        ggplot2::theme(text = ggplot2::element_text(size = 14))
                 } else if (j < i) {
                     # Lower triangle: scatter plot
                     p_ij <- ggplot(df_plot, aes(x = .data[[names(df_plot)[j]]], y = .data[[names(df_plot)[i]]])) +
-                        geom_point(alpha = 0.2, size = 0.3) +
+                        geom_point(alpha = 0.2, size = 0.5) +
                         ggplot2::theme_bw() +
-                        ggplot2::theme(text = ggplot2::element_text(size = 8))
+                        ggplot2::theme(text = ggplot2::element_text(size = 14))
                 } else {
                     # Upper triangle: correlation
                     cor_val <- cor(df_plot[, j], df_plot[, i], use = "complete.obs")
                     p_ij <- ggplot() + 
-                        annotate("text", x = 0.5, y = 0.5, label = sprintf("r = %.2f", cor_val), size = 3) +
+                        annotate("text", x = 0.5, y = 0.5, label = sprintf("r = %.2f", cor_val), size = 5) +
                         theme_void() +
-                        ggplot2::theme(text = ggplot2::element_text(size = 8))
+                        ggplot2::theme(text = ggplot2::element_text(size = 14))
                 }
                 plots_list[[paste0(i, "_", j)]] <- p_ij
             }
@@ -697,7 +697,7 @@ plot_posterior_pairs <- function(fit, pars = c("theta", "f", "log_tau")) {
         p <- cowplot::plot_grid(plotlist = plots_list, 
                                  nrow = n_pars, ncol = n_pars,
                                  labels = names(df_plot),
-                                 label_size = 8)
+                                 label_size = 14)
         
         return(p)
     } else {
