@@ -634,7 +634,7 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
 
 #' Plot pairs of posterior samples.
 #'
-#' @param fit Stan fit object.
+#' @param fit Stan fit object or mrhevo_numpyro object.
 #' @param pars Vector of parameter names to plot (default c("f", "log_c", "log_tau")).
 #'
 #' @return A ggplot object showing pairs plot.
@@ -642,23 +642,81 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
 #' @import bayesplot ggplot2
 #' @export
 plot_posterior_pairs <- function(fit, pars = c("f", "log_c", "log_tau")) {
-    # Get NUTS parameters including divergent transitions
-    np <- bayesplot::nuts_params(fit, type = "divergent")
-
-    # Create pairs plot with diverging transitions highlighted
-    p <- bayesplot::mcmc_pairs(fit, pars = pars,
-                               np = np,
-                               off_diag_args = list(alpha = 0.3))
-
-    # Increase text size
-    p <- p + ggplot2::theme_bw() + ggplot2::theme(text = ggplot2::element_text(size = 18))
-
-    return(p)
+    if (inherits(fit, "mrhevo_numpyro")) {
+        post <- convert_to_rstan(fit)
+        
+        # Get scalar parameters as vectors
+        n <- length(post$theta)
+        
+        # Create data frame for plotting
+        df_plot <- data.frame(
+            theta = post$theta,
+            f = rep(post$f, length.out = n),
+            log_c = rep(post$log_c, length.out = n),
+            log_tau = rep(post$log_tau, length.out = n)
+        )
+        
+        # Select requested parameters
+        df_plot <- df_plot[, colnames(df_plot) %in% pars, drop = FALSE]
+        
+        if (ncol(df_plot) < 2) {
+            stop("Need at least 2 parameters for pairs plot")
+        }
+        
+        # Create pairs plot using cowplot::plot_grid
+        plots_list <- list()
+        n_pars <- ncol(df_plot)
+        
+        for (i in 1:n_pars) {
+            for (j in 1:n_pars) {
+                if (i == j) {
+                    # Diagonal: histogram
+                    p_ij <- ggplot(df_plot, aes_string(x = names(df_plot)[i])) +
+                        geom_histogram(fill = "steelblue", color = "white", bins = 30) +
+                        ggplot2::theme_bw() +
+                        ggplot2::theme(text = ggplot2::element_text(size = 8))
+                } else if (j < i) {
+                    # Lower triangle: scatter plot
+                    p_ij <- ggplot(df_plot, aes_string(x = names(df_plot)[j], y = names(df_plot)[i])) +
+                        geom_point(alpha = 0.2, size = 0.3) +
+                        ggplot2::theme_bw() +
+                        ggplot2::theme(text = ggplot2::element_text(size = 8))
+                } else {
+                    # Upper triangle: correlation
+                    cor_val <- cor(df_plot[, j], df_plot[, i], use = "complete.obs")
+                    p_ij <- ggplot() + 
+                        annotate("text", x = 0.5, y = 0.5, label = sprintf("r = %.2f", cor_val), size = 3) +
+                        theme_void() +
+                        ggplot2::theme(text = ggplot2::element_text(size = 8))
+                }
+                plots_list[[paste0(i, "_", j)]] <- p_ij
+            }
+        }
+        
+        # Arrange in grid
+        p <- cowplot::plot_grid(plotlist = plots_list, 
+                                 nrow = n_pars, ncol = n_pars,
+                                 labels = names(df_plot),
+                                 label_size = 8)
+        
+        return(p)
+    } else {
+        # Stan output - use bayesplot
+        np <- bayesplot::nuts_params(fit, type = "divergent")
+        
+        p <- bayesplot::mcmc_pairs(fit, pars = pars,
+                                   np = np,
+                                   off_diag_args = list(alpha = 0.3))
+        
+        p <- p + ggplot2::theme_bw() + ggplot2::theme(text = ggplot2::element_text(size = 18))
+        
+        return(p)
+    }
 }
 
 #' Plot histogram of kappa shrinkage coefficients.
 #'
-#' @param fit Stan fit object.
+#' @param fit Stan fit object or mrhevo_numpyro object.
 #' @param bin_width Width of bins for histogram (default 0.02).
 #'
 #' @return A ggplot object showing histogram of kappa values.
@@ -666,8 +724,14 @@ plot_posterior_pairs <- function(fit, pars = c("f", "log_c", "log_tau")) {
 #' @import ggplot2
 #' @export
 plot_kappa_hist <- function(fit, bin_width = 0.02) {
-    posterior <- rstan::extract(fit)
-    kappa <- posterior$kappa
+    if (inherits(fit, "mrhevo_numpyro")) {
+        # NumPyro output
+        kappa <- fit$posterior$kappa
+    } else {
+        # Stan output
+        posterior <- rstan::extract(fit)
+        kappa <- posterior$kappa
+    }
 
     kappa_vec <- as.vector(kappa)
     kappa_dt <- data.table::data.table(kappa = kappa_vec)

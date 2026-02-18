@@ -54,7 +54,7 @@ devtools::run_examples()
 
 This example demonstrates how to run MR-Hevo using summary statistics only (no individual-level data required). In the example dataset, the outcome variable is type 2 diabetes and the exposure is plasma levels of adiponectin (encoded by _ADIPOQ_). The instruments are 43 scalar _trans_-QTLs for adiponectin levels.
 
-The recommended implementation uses NumPyro (Python-based MCMC) via the reticulate package, which is approximately 4x faster than Stan. The Stan implementation gives very similar results.
+The **default implementation** uses NumPyro (Python-based MCMC) via the reticulate package, which is approximately 4x faster than Stan. The Stan implementation gives very similar results.
 
 ```r
 library(mrhevo)
