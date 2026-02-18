@@ -37,7 +37,8 @@ Imports:
     car,
     ggrepel,
     ggplot2,
-    ggplotify
+    ggplotify,
+    reticulate
 Suggests:
     testthat (>= 3.0)
 LinkingTo: Rcpp, BH, bigmemory, RcppEigen

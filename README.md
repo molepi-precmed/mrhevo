@@ -12,12 +12,11 @@ As the form of the distribution of pleiotropic effects over loci is unknown, any
 
 3. The marginal likelihood of the causal effect parameter is computed from the posterior and the prior, yielding classical maximum likelihood estimates and _p_-values for the causal effect.
 
-The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are scalar variables calculated from clumps of SNPs that have _trans_- effects on the expression of a gene as transcript or circulating protein.
+The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are scalar variables calculated from clumps of SNPs that have _trans_- effects on the expression of a gene as transcript or circulating protein.  There is no need to exclude weak instruments because they are correctly handled by Bayesian inference.
 
 ## Guide
 
-- A description of the statistical model is available on [theory page](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf)
-- Also refer to the package [vignette](https://htmlpreview.github.io/?https://github.com/molepi-precmed/mrhevo/blob/main/vignette.html)
+- A description of the statistical model is available on the [theory page](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf)
 
 ## Installation
 
@@ -116,6 +115,46 @@ print(p_pairs)
 p_kappa <- plot_kappa_hist(fit, bin_width = 0.02)
 print(p_kappa)
 ```
+
+### Using NumPyro instead of Stan
+
+As an alternative to Stan, you can use NumPyro (Python-based MCMC) via the reticulate package. This requires a Python environment with NumPyro installed.
+
+```r
+library(reticulate)
+
+# Use the NumPyro virtual environment (must be set up first)
+use_virtualenv("~/.virtualenvs/mrhevo", required = TRUE)
+
+# Run MR-Hevo with NumPyro
+fit_np <- run_mrhevo.numpyro(
+  alpha_hat = alpha_hat,
+  se.alpha_hat = se.alpha_hat,
+  gamma_hat = gamma_hat,
+  se.gamma_hat = se.gamma_hat,
+  fraction_pleio = 0.5,
+  slab_scale = 0.2,
+  priorsd_theta = 1,
+  model_path = "inst/python/mrhevo_pyro.py",
+  num_warmup = 500,
+  num_samples = 1000,
+  num_chains = 4
+)
+
+# Get posterior summary
+cat("theta mean:", mean(fit_np$posterior$theta), "\n")
+cat("theta sd:", sd(fit_np$posterior$theta), "\n")
+cat("f mean:", mean(fit_np$posterior$f), "\n")
+```
+
+### Runtime Comparison
+
+| Sampler | Time (seconds) | theta mean | theta sd |
+|---------|---------------|-----------|----------|
+| Stan    | 18.9          | -0.337    | 0.051    |
+| NumPyro | 4.4           | -0.339    | 0.050    |
+
+NumPyro is approximately **4x faster** than Stan for this dataset while producing similar posterior estimates.
 
 ### Example results
 

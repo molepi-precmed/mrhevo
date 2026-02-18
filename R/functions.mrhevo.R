@@ -667,3 +667,184 @@ plot_kappa_hist <- function(fit, bin_width = 0.02) {
 
     return(p)
 }
+
+#' Run Stan model for Mendelian randomization using NumPyro.
+#'
+#' @param alpha_hat Vector of estimated coefficients for effect of instruments
+#'        on exposure.
+#' @param se.alpha_hat Vector of standard errors for coefficients alpha_hat.
+#' @param gamma_hat Vector of estimated coefficients for effect of instruments
+#'        on outcome.
+#' @param se.gamma_hat Vector of standard errors for coefficients gamma_hat.
+#' @param fraction_pleio Prior guess at fraction of instruments that have
+#'        pleiotropic effects.
+#' @param slab_scale Scale for the slab component of regularized horseshoe.
+#' @param slab_df Degrees of freedom for slab component.
+#' @param priorsd_theta Standard deviation of prior on theta.
+#' @param model_path Path to the mrhevo_pyro.py script.
+#' @param env_path Path to Python virtual environment (default: ~/.virtualenvs/mrhevo).
+#' @param num_warmup Number of warmup iterations (default 500).
+#' @param num_samples Number of samples (default 1000).
+#' @param num_chains Number of chains (default 4).
+#' @param target_accept_prob Target acceptance probability (default 0.95).
+#'
+#' @return A list with posterior samples in rstan-like format.
+#'
+#' @import reticulate
+#' @export
+run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
+                                fraction_pleio = 0.5, slab_scale = 0.2, slab_df = 2,
+                                priorsd_theta = 1, model_path = NULL,
+                                env_path = NULL,
+                                num_warmup = 500, num_samples = 1000,
+                                num_chains = 4, target_accept_prob = 0.95) {
+
+    if (is.null(env_path)) {
+        env_path <- "~/.virtualenvs/mrhevo"
+    }
+
+    reticulate::use_virtualenv(env_path, required = TRUE)
+
+    if (is.null(model_path)) {
+        model_path <- system.file("python", "mrhevo_pyro.py", package = "mrhevo")
+        if (model_path == "") {
+            stop("mrhevo_pyro.py not found. Please provide model_path or install the Python script.")
+        }
+    }
+
+    msg(bold, "Setting up NumPyro...")
+
+    np <- reticulate::import("numpy", as = "np")
+    jnp <- reticulate::import("jax.numpy", as = "jnp")
+    random <- reticulate::import("jax.random")
+    numpyro <- reticulate::import("numpyro")
+    numpyro_distributions <- reticulate::import("numpyro.distributions")
+
+    reticulate::source_python(model_path)
+
+    J <- length(alpha_hat)
+    var.theta_IV_delta <- (se.gamma_hat / alpha_hat)^2 + gamma_hat^2 * se.alpha_hat^2 / alpha_hat^4
+    info <- mean(1 / var.theta_IV_delta)
+
+    nu_global <- 1
+    nu_local <- 1
+    r_pleio <- fraction_pleio * J
+    tau0 <- (r_pleio / (J - r_pleio)) / sqrt(info)
+    priormedian <- qt(p = 0.75, df = nu_global, lower.tail = TRUE)
+    scale_global <- tau0 / priormedian
+
+    msg(bold, "Running NumPyro MCMC...")
+
+    model <- mrhevo(
+        alpha_hat = np$array(alpha_hat),
+        se_alpha_hat = np$array(se.alpha_hat),
+        gamma_hat = np$array(gamma_hat),
+        se_gamma_hat = np$array(se.gamma_hat),
+        slab_scale = slab_scale,
+        slab_df = slab_df,
+        scale_global = scale_global,
+        priorsd_theta = priorsd_theta,
+        info = np$array(info)
+    )
+
+    nuts_kernel <- numpyro$infer$MCMC(
+        numpyro$infer$NUTS(model, target_accept_prob = target_accept_prob),
+        num_warmup = as.integer(num_warmup),
+        num_samples = as.integer(num_samples),
+        num_chains = as.integer(num_chains),
+        chain_method = "parallel",
+        progress_bar = TRUE
+    )
+
+    start_time <- Sys.time()
+    rng_key <- random$PRNGKey(42L)
+    nuts_kernel$run(rng_key,
+                    alpha_hat = np$array(alpha_hat),
+                    se_alpha_hat = np$array(se.alpha_hat),
+                    gamma_hat = np$array(gamma_hat),
+                    se_gamma_hat = np$array(se.gamma_hat),
+                    slab_scale = as.double(slab_scale),
+                    slab_df = as.double(slab_df),
+                    scale_global = as.double(scale_global),
+                    priorsd_theta = as.double(priorsd_theta),
+                    info = np$array(info))
+    elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+    msg(note, paste0("NumPyro sampling completed in ", round(elapsed, 1), " seconds\n"))
+
+    samples <- nuts_kernel$get_samples()
+
+    sample_names <- c("theta", "tau", "log_tau", "eta", "log_eta", "f", "b",
+                      "alpha", "beta", "kappa", "lambda_tilde")
+
+    np <- reticulate::import("numpy", as = "np")
+    az <- reticulate::import("arviz")
+
+    idata <- az$from_numpyro(nuts_kernel)
+
+    posterior_list <- list()
+    for (name in sample_names) {
+        tryCatch({
+            if (name %in% names(idata$posterior)) {
+                arr <- np$asarray(idata$posterior[[name]])
+                arr <- reticulate::py_to_r(arr)
+                if (!is.null(dim(arr))) {
+                    if (length(dim(arr)) == 2) {
+                        arr <- as.vector(arr)
+                    }
+                } else {
+                    arr <- as.vector(arr)
+                }
+                posterior_list[[name]] <- arr
+            }
+        }, error = function(e) {
+            cat("Error extracting", name, ":", conditionMessage(e), "\n")
+        })
+    }
+
+    fit_numpyro <- list(
+        posterior = posterior_list,
+        elapsed = elapsed,
+        num_chains = num_chains,
+        num_samples = num_samples,
+        num_warmup = num_warmup
+    )
+
+    class(fit_numpyro) <- "mrhevo_numpyro"
+
+    return(fit_numpyro)
+}
+
+#' Convert NumPyro posterior to rstan-like format.
+#'
+#' @param fit A mrhevo_numpyro object.
+#'
+#' @return A list with posterior samples in rstan-compatible format.
+#'
+#' @export
+convert_to_rstan <- function(fit) {
+    if (!inherits(fit, "mrhevo_numpyro")) {
+        stop("fit must be a mrhevo_numpyro object")
+    }
+
+    J <- ncol(fit$posterior$kappa)
+    n_samples <- dim(fit$posterior$theta)[1]
+    n_chains <- dim(fit$posterior$theta)[2]
+
+    dim(fit$posterior$theta) <- c(n_samples * n_chains)
+    dim(fit$posterior$f) <- c(1)
+    dim(fit$posterior$log_tau) <- c(1)
+    dim(fit$posterior$log_eta) <- c(1)
+
+    result <- list(
+        theta = fit$posterior$theta,
+        f = fit$posterior$f,
+        log_c = fit$posterior$log_eta,
+        log_tau = fit$posterior$log_tau,
+        kappa = fit$posterior$kappa,
+        alpha = fit$posterior$alpha,
+        beta = fit$posterior$beta
+    )
+
+    return(result)
+}
