@@ -413,7 +413,8 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
 #' @export
 run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                               fraction_pleio=NULL, slab_scale=0.2, slab_df=2,
-                              priorsd_theta=1, model.dir) {
+                              priorsd_theta=1, model.dir,
+                              hierarchical_alpha = TRUE) {
     require(rstan)
     options(mc.cores = parallel::detectCores())
     rstan_options(auto_write = TRUE)
@@ -466,7 +467,8 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                       scale_global=scale_global,
                       priorsd_theta=priorsd_theta,
                       slab_scale=slab_scale,
-                      slab_df=slab_df, priorsd_theta=priorsd_theta)
+                      slab_df=slab_df,
+                      hierarchical_alpha=as.integer(hierarchical_alpha))
     msg(bold, "Sampling posterior distribution ... ")
     fit.mc <- rstan::sampling(object=mr.sstats.stanmodel,
                               data=data.stan,
@@ -477,6 +479,21 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                               control=list(adapt_delta=0.99),
                               verbose=TRUE)
     msg(note, "Done.\n")
+
+    ## Check for sampling warnings
+    sampler_params <- rstan::get_sampler_params(fit.mc, inc_warmup = FALSE)
+    divergent <- sum(sapply(sampler_params, function(x) sum(x[,"divergent__"])))
+    total_iterations <- sum(sapply(sampler_params, nrow))
+
+    if (divergent > 0) {
+      warning(paste0("There were ", divergent, " divergent transitions after warmup (",
+                     round(100 * divergent / total_iterations, 1), "% of iterations). ",
+                     "This may indicate sampling difficulties. To address this:\n",
+                     "  - Reduce slab_scale (try 0.1 or 0.05)\n",
+                     "  - Increase slab_df (try 4 or 8)\n",
+                     "  - Increase warmup iterations (e.g., warmup=2000)"))
+    }
+
     return(fit.mc)
 }
 
@@ -696,6 +713,7 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                                 fraction_pleio = 0.5, slab_scale = 0.2, slab_df = 2,
                                 priorsd_theta = 1, model_path = NULL,
                                 env_path = NULL,
+                                hierarchical_alpha = TRUE,
                                 num_warmup = 500, num_samples = 1000,
                                 num_chains = 4, target_accept_prob = 0.95) {
 
@@ -744,7 +762,7 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
         slab_df = slab_df,
         scale_global = scale_global,
         priorsd_theta = priorsd_theta,
-        info = np$array(info)
+        hierarchical_alpha = as.integer(hierarchical_alpha)
     )
 
     nuts_kernel <- numpyro$infer$MCMC(
@@ -767,7 +785,7 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                     slab_df = as.double(slab_df),
                     scale_global = as.double(scale_global),
                     priorsd_theta = as.double(priorsd_theta),
-                    info = np$array(info))
+                    hierarchical_alpha = as.integer(hierarchical_alpha))
     elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
     msg(note, paste0("NumPyro sampling completed in ", round(elapsed, 1), " seconds\n"))

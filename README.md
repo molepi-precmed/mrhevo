@@ -52,10 +52,13 @@ devtools::run_examples()
 
 ## Example: Using summary statistics
 
-This example demonstrates how to run MR-Hevo using summary statistics only (no individual-level data required).  In the example dataset, the outcome variable is type 2 diabetes and the exposure is plasma levels of adiponectin (encoded by _ADIPOQ_).  The instruments are 43 scalar _trans_-QTLs for adiponectin levels.  
+This example demonstrates how to run MR-Hevo using summary statistics only (no individual-level data required). In the example dataset, the outcome variable is type 2 diabetes and the exposure is plasma levels of adiponectin (encoded by _ADIPOQ_). The instruments are 43 scalar _trans_-QTLs for adiponectin levels.
 
-```r 
+The recommended implementation uses NumPyro (Python-based MCMC) via the reticulate package, which is approximately 4x faster than Stan. The Stan implementation gives very similar results.
+
+```r
 library(mrhevo)
+library(reticulate)
 
 ## Load example summary statistics dataset (included in package)
 coeffs <- readRDS(system.file("data/coeffs.RDS", package = "mrhevo"))
@@ -72,12 +75,13 @@ se.gamma_hat <- coeffs$se.gamma_hat
 
 cat("Number of genetic instruments:", length(alpha_hat), "\n")
 
-## Path to Stan models (included in package)
-model.dir <- system.file("stan", package = "mrhevo")
+## Path to Python model (included in package)
+model_path <- system.file("python", "mrhevo_pyro.py", package = "mrhevo")
 
-## Run MR-Hevo with summary statistics
+## Run MR-Hevo with NumPyro
 ## Using default priors: fraction_pleio = 0.5 (prior guess that 50% of instruments are pleiotropic)
-fit <- run_mrhevo.sstats(
+## Default: hierarchical_alpha = TRUE (uses hierarchical prior on alpha for additional shrinkage)
+fit <- run_mrhevo.numpyro(
   alpha_hat = alpha_hat,
   se.alpha_hat = se.alpha_hat,
   gamma_hat = gamma_hat,
@@ -85,49 +89,39 @@ fit <- run_mrhevo.sstats(
   fraction_pleio = 0.5,
   slab_scale = 0.2,
   priorsd_theta = 1,
-  model.dir = model.dir
+  model_path = model_path,
+  num_warmup = 500,
+  num_samples = 1000,
+  num_chains = 4
 )
 
-## Extract posterior samples
-posterior_samples <- rstan::extract(fit)
-
 ## Get posterior summary
-print(summary(fit, pars = "theta")$summary)
+cat("theta mean:", mean(fit$posterior$theta), "\n")
+cat("theta sd:", sd(fit$posterior$theta), "\n")
+cat("f (pleiotropy fraction) mean:", mean(fit$posterior$f), "\n")
 
 ## Compute MLE and p-value from posterior
-mle_result <- mle.se.pval(posterior_samples$theta, rep(1, length(posterior_samples$theta)))
+mle_result <- mle.se.pval(fit$posterior$theta, rep(1, length(fit$posterior$theta)))
 print(mle_result)
 
 ## Plot IV estimates with MLE as slope line through origin
 theta_mle <- mle_result$Estimate
 p <- plot_iv_estimates(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta_mle, coeffs$qtlname)
 print(p)
-
-## Plot log-likelihood function with quadratic approximation
-p_loglik <- mle.se.pval(posterior_samples$theta, rep(1, length(posterior_samples$theta)), return.asplot=TRUE)
-print(p_loglik)
-
-## Plot pairs of posterior samples (f, log_c, log_tau)
-p_pairs <- plot_posterior_pairs(fit)
-print(p_pairs)
-
-## Plot histogram of kappa shrinkage coefficients (bin width 0.02, proportion)
-p_kappa <- plot_kappa_hist(fit, bin_width = 0.02)
-print(p_kappa)
 ```
 
-### Using NumPyro instead of Stan
+### Using Stan instead of NumPyro
 
-As an alternative to Stan, you can use NumPyro (Python-based MCMC) via the reticulate package. This requires a Python environment with NumPyro installed.
+As an alternative to NumPyro, you can use the Stan implementation. The Stan implementation gives very similar results but is approximately 4x slower.
 
 ```r
-library(reticulate)
+library(rstan)
 
-# Use the NumPyro virtual environment (must be set up first)
-use_virtualenv("~/.virtualenvs/mrhevo", required = TRUE)
+# Path to Stan models (included in package)
+model.dir <- system.file("stan", package = "mrhevo")
 
-# Run MR-Hevo with NumPyro
-fit_np <- run_mrhevo.numpyro(
+# Run MR-Hevo with Stan
+fit_stan <- run_mrhevo.sstats(
   alpha_hat = alpha_hat,
   se.alpha_hat = se.alpha_hat,
   gamma_hat = gamma_hat,
@@ -135,17 +129,24 @@ fit_np <- run_mrhevo.numpyro(
   fraction_pleio = 0.5,
   slab_scale = 0.2,
   priorsd_theta = 1,
-  model_path = "inst/python/mrhevo_pyro.py",
-  num_warmup = 500,
-  num_samples = 1000,
-  num_chains = 4
+  model.dir = model.dir,
+  hierarchical_alpha = TRUE  # use hierarchical prior on alpha (default)
 )
 
 # Get posterior summary
-cat("theta mean:", mean(fit_np$posterior$theta), "\n")
-cat("theta sd:", sd(fit_np$posterior$theta), "\n")
-cat("f mean:", mean(fit_np$posterior$f), "\n")
+print(summary(fit_stan, pars = "theta")$summary)
 ```
+
+**Note on sampling warnings:** If you see warnings about divergent transitions, this indicates sampling difficulties. To address this:
+- Reduce `slab_scale` (try 0.1 or 0.05)
+- Increase `slab_df` (try 4 or 8)
+- Increase the number of warmup iterations
+
+### About the hierarchical prior on alpha
+
+By default, MR-Hevo uses a hierarchical prior on the instrument-exposure effects (alpha): `alpha ~ Normal(mu_alpha, sigma_alpha)` where `mu_alpha` and `sigma_alpha` are learned from the data. This provides additional shrinkage of instrument effects toward a common mean.
+
+You can disable this by setting `hierarchical_alpha = FALSE`, which uses the non-hierarchical prior `alpha ~ Normal(alpha_hat, sd_alpha_hat)`. The hierarchical prior is recommended when instruments are believed to have similar effects on the exposure.
 
 ### Runtime Comparison
 

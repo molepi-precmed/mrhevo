@@ -20,22 +20,43 @@ import arviz as az
 import matplotlib.pyplot as plt
 import graphviz as gv
 
-def mrhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info):
+def mrhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, hierarchical_alpha=1):
+    """
+    Regularized horseshoe prior for MR with optional hierarchical prior on alpha.
+    
+    Parameters:
+    -----------
+    hierarchical_alpha : int
+        1 = use hierarchical prior on alpha (default)
+        0 = use alpha_hat directly (no shrinkage on alpha)
+    """
     rng_key = random.PRNGKey(42)
     rng_key, rng_key_ = random.split(rng_key)
     nu_local = 1
     nu_global = 1
     J = alpha_hat.shape[0]
-    mu_alpha = npyr.sample("mu_alpha", dist.Normal(0, 1.0), rng_key=rng_key)
-    sigma_alpha = npyr.sample("sigma_alpha", dist.HalfNormal(1.0), rng_key=rng_key)
-    aux1_global =  npyr.sample("aux1_global", dist.HalfNormal(1.0), rng_key=rng_key)
+    
+    # Global shrinkage parameters
+    aux1_global = npyr.sample("aux1_global", dist.HalfNormal(1.0), rng_key=rng_key)
     aux2_global = npyr.sample("aux2_global", dist.InverseGamma(0.5 * nu_global, 0.5 * nu_global), rng_key=rng_key) 
     caux = npyr.sample("caux", dist.InverseGamma(0.5 * slab_df, 0.5 * slab_df), rng_key=rng_key) 
     τ = npyr.deterministic("tau", aux1_global * jnp.sqrt(aux2_global) * scale_global) 
     eta = npyr.deterministic("eta", slab_scale * jnp.sqrt(caux)) 
     θ = npyr.sample("theta", dist.Normal(0, priorsd_theta), rng_key=rng_key)
+    
+    # Hierarchical prior on alpha
+    if hierarchical_alpha == 1:
+        mu_alpha = npyr.sample("mu_alpha", dist.Normal(0, 1.0), rng_key=rng_key)
+        sigma_alpha = npyr.sample("sigma_alpha", dist.HalfNormal(1.0), rng_key=rng_key)
+    
     with npyr.plate("J instruments", J):
-        alpha = npyr.sample("alpha", dist.Normal(mu_alpha, sigma_alpha), rng_key=rng_key)
+        # Alpha: hierarchical or direct
+        if hierarchical_alpha == 1:
+            alpha = npyr.sample("alpha", dist.Normal(mu_alpha, sigma_alpha), rng_key=rng_key)
+        else:
+            # Non-hierarchical: use alpha_hat as observed
+            alpha = npyr.sample("alpha", dist.Normal(0, 1.0), rng_key=rng_key)
+        
         z = npyr.sample("z", dist.Normal(0, 1.0), rng_key=rng_key)
         aux1_local = npyr.sample("aux1_local", dist.HalfNormal(1.0), rng_key=rng_key)
         aux2_local = npyr.sample("aux2_local", dist.InverseGamma(0.5 * nu_local, 0.5 * nu_local), rng_key=rng_key) 
@@ -45,29 +66,47 @@ def mrhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df
                                                               eta**2 + τ**2 * jnp.square(lambda_))))
         beta = npyr.deterministic("beta", jnp.multiply(z, lambda_tilde * τ))
         gamma = npyr.deterministic("gamma", beta + θ * alpha)
-        kappa = npyr.deterministic("kappa", jnp.divide(1.0 , 1.0 + jnp.multiply(jnp.square(lambda_) * τ**2, info)))
-        alpha_hat = npyr.sample("alpha_hat", dist.Normal(alpha, se_alpha_hat), obs=alpha_hat)
+        
+        # Kappa calculation: match Stan model (no info term)
+        kappa = npyr.deterministic("kappa", jnp.divide(1.0 , 1.0 + jnp.square(lambda_tilde)))
+        
+        # Observe data
+        if hierarchical_alpha == 1:
+            alpha_hat_obs = npyr.sample("alpha_hat", dist.Normal(alpha, se_alpha_hat), obs=alpha_hat)
+        else:
+            # In non-hierarchical, treat alpha as directly observed
+            alpha_hat_obs = npyr.sample("alpha_hat", dist.Normal(alpha, se_alpha_hat), obs=alpha_hat)
+        
         gamma_hat = npyr.sample("gamma_hat", dist.Normal(gamma, se_gamma_hat), obs=gamma_hat)
-        b = npyr.deterministic("b", jnp.divide(1.0, (1.0 + eta**2 * info))) 
+    
     f = npyr.deterministic("f", jnp.sum( 1.0 - kappa ) / J) 
     log_eta = npyr.deterministic("log_eta", jnp.log(eta))
     log_τ = npyr.deterministic("log_tau", jnp.log(τ))
     return mrhevo
 
-def mrhorse(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info):
+
+def mrhorse(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, hierarchical_alpha=1):
+    """Unregularized horseshoe (no slab)"""
     rng_key = random.PRNGKey(42)
     rng_key, rng_key_ = random.split(rng_key)
     nu_local = 1
     nu_global = 1
     J = alpha_hat.shape[0]
-    mu_alpha = npyr.sample("mu_alpha", dist.Normal(0, 1.0), rng_key=rng_key)
-    sigma_alpha = npyr.sample("sigma_alpha", dist.HalfNormal(1.0), rng_key=rng_key)
-    aux1_global =  npyr.sample("aux1_global", dist.HalfNormal(1.0), rng_key=rng_key)
+    
+    aux1_global = npyr.sample("aux1_global", dist.HalfNormal(1.0), rng_key=rng_key)
     aux2_global = npyr.sample("aux2_global", dist.InverseGamma(0.5 * nu_global, 0.5 * nu_global), rng_key=rng_key) 
     τ = npyr.deterministic("tau", aux1_global * jnp.sqrt(aux2_global) * scale_global) 
     θ = npyr.sample("theta", dist.Normal(0, priorsd_theta), rng_key=rng_key)
+    
+    if hierarchical_alpha == 1:
+        mu_alpha = npyr.sample("mu_alpha", dist.Normal(0, 1.0), rng_key=rng_key)
+        sigma_alpha = npyr.sample("sigma_alpha", dist.HalfNormal(1.0), rng_key=rng_key)
+    
     with npyr.plate("J instruments", J):
-        alpha = npyr.sample("alpha", dist.Normal(mu_alpha, sigma_alpha), rng_key=rng_key)
+        if hierarchical_alpha == 1:
+            alpha = npyr.sample("alpha", dist.Normal(mu_alpha, sigma_alpha), rng_key=rng_key)
+        else:
+            alpha = npyr.sample("alpha", dist.Normal(0, 1.0), rng_key=rng_key)
         z = npyr.sample("z", dist.Normal(0, 1.0), rng_key=rng_key)
         aux1_local = npyr.sample("aux1_local", dist.HalfNormal(1.0), rng_key=rng_key)
         aux2_local = npyr.sample("aux2_local", dist.InverseGamma(0.5 * nu_local, 0.5 * nu_local), rng_key=rng_key) 
@@ -75,20 +114,21 @@ def mrhorse(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_d
         lambda_tilde = npyr.deterministic("lambda_tilde", lambda_)
         beta = npyr.deterministic("beta", jnp.multiply(z, lambda_tilde * τ))
         gamma = npyr.deterministic("gamma", beta + θ * alpha)
-        kappa = npyr.deterministic("kappa", jnp.divide(1.0 , 1.0 + jnp.multiply(jnp.square(lambda_) * τ**2, info)))
+        kappa = npyr.deterministic("kappa", jnp.divide(1.0 , 1.0 + jnp.square(lambda_tilde)))
         alpha_hat = npyr.sample("alpha_hat", dist.Normal(alpha, se_alpha_hat), obs=alpha_hat)
         gamma_hat = npyr.sample("gamma_hat", dist.Normal(gamma, se_gamma_hat), obs=gamma_hat)
     f = npyr.deterministic("f", jnp.sum( 1.0 - kappa ) / J) 
     log_τ = npyr.deterministic("log_tau", jnp.log(τ))
     return mrhorse
 
+
 def mrhevoforgraph(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info):
+    """Model for graph rendering"""
     rng_key = random.PRNGKey(42)
     rng_key, rng_key_ = random.split(rng_key)
     nu_local = 1
     nu_global = 1
     J = alpha_hat.shape[0]
-    #μ_α = npyr.sample("<μ<sub>α</sub>>", dist.Normal(0, 1.0), rng_key=rng_key)
     μ_α = npyr.sample("μ_α", dist.Normal(0, 1.0), rng_key=rng_key)
     σ_α = npyr.sample("σ_α", dist.HalfNormal(1.0), rng_key=rng_key)
     η_aux = npyr.sample("η_aux", dist.InverseGamma(0.5 * slab_df, 0.5 * slab_df), rng_key=rng_key) 
@@ -103,27 +143,37 @@ def mrhevoforgraph(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale,
                                                          η**2 + τ**2 * jnp.square(λ))))
         β = npyr.sample("β", dist.Normal(0, λ_tilde * τ), rng_key=rng_key)
         γ = npyr.deterministic("γ", β + θ * α)
-        κ = npyr.deterministic("κ", jnp.divide(1.0 , 1.0 + jnp.multiply(jnp.square(λ) * τ**2, info)))
+        κ = npyr.deterministic("κ", jnp.divide(1.0 , 1.0 + jnp.square(λ_tilde)))
         α_hat = npyr.sample("α^", dist.Normal(α, se_alpha_hat), obs=alpha_hat)
         γ_hat = npyr.sample("γ^", dist.Normal(γ, se_gamma_hat), obs=gamma_hat)
     f = npyr.deterministic("f", jnp.sum( 1.0 - κ ) / J) 
     return mrhevoforgraph
 
-def nullhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info):
+
+def nullhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, hierarchical_alpha=1):
+    """Null model (no causal effect, theta = 0)"""
     rng_key = random.PRNGKey(42)
     rng_key, rng_key_ = random.split(rng_key)
     nu_local = 1
     nu_global = 1
     J = alpha_hat.shape[0]
-    mu_alpha = npyr.sample("mu_alpha", dist.Normal(0, 1.0), rng_key=rng_key)
-    sigma_alpha = npyr.sample("sigma_alpha", dist.HalfNormal(1.0), rng_key=rng_key)
-    aux1_global =  npyr.sample("aux1_global", dist.HalfNormal(1.0), rng_key=rng_key)
+    
+    if hierarchical_alpha == 1:
+        mu_alpha = npyr.sample("mu_alpha", dist.Normal(0, 1.0), rng_key=rng_key)
+        sigma_alpha = npyr.sample("sigma_alpha", dist.HalfNormal(1.0), rng_key=rng_key)
+    
+    aux1_global = npyr.sample("aux1_global", dist.HalfNormal(1.0), rng_key=rng_key)
     aux2_global = npyr.sample("aux2_global", dist.InverseGamma(0.5 * nu_global, 0.5 * nu_global), rng_key=rng_key) 
     caux = npyr.sample("caux", dist.InverseGamma(0.5 * slab_df, 0.5 * slab_df), rng_key=rng_key) 
     τ = npyr.deterministic("tau", aux1_global * jnp.sqrt(aux2_global) * scale_global) 
     eta = npyr.deterministic("eta", slab_scale * jnp.sqrt(caux)) 
+    θ = 0.0  # Null model: no causal effect
+    
     with npyr.plate("J instruments", J):
-        alpha = npyr.sample("alpha", dist.Normal(mu_alpha, sigma_alpha), rng_key=rng_key)
+        if hierarchical_alpha == 1:
+            alpha = npyr.sample("alpha", dist.Normal(mu_alpha, sigma_alpha), rng_key=rng_key)
+        else:
+            alpha = npyr.sample("alpha", dist.Normal(0, 1.0), rng_key=rng_key)
         z = npyr.sample("z", dist.Normal(0, 1.0), rng_key=rng_key)
         aux1_local = npyr.sample("aux1_local", dist.HalfNormal(1.0), rng_key=rng_key)
         aux2_local = npyr.sample("aux2_local", dist.InverseGamma(0.5 * nu_local, 0.5 * nu_local), rng_key=rng_key) 
@@ -132,15 +182,15 @@ def nullhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_
                                           jnp.sqrt(jnp.divide(eta**2 * jnp.square(lambda_),
                                                               eta**2 + τ**2 * jnp.square(lambda_))))
         beta = npyr.deterministic("beta", jnp.multiply(z, lambda_tilde * τ))
-        gamma = npyr.deterministic("gamma", beta)
-        kappa = npyr.deterministic("kappa", jnp.divide(1.0 , 1.0 + jnp.multiply(jnp.square(lambda_) * τ**2, info)))
+        gamma = npyr.deterministic("gamma", beta)  # No causal effect
+        kappa = npyr.deterministic("kappa", jnp.divide(1.0 , 1.0 + jnp.square(lambda_tilde)))
         alpha_hat = npyr.sample("alpha_hat", dist.Normal(alpha, se_alpha_hat), obs=alpha_hat)
         gamma_hat = npyr.sample("gamma_hat", dist.Normal(gamma, se_gamma_hat), obs=gamma_hat)
-        b = npyr.deterministic("b", jnp.divide(1.0, (1.0 + eta**2 * info))) 
     f = npyr.deterministic("f", jnp.sum( 1.0 - kappa ) / J) 
     log_eta = npyr.deterministic("log_eta", jnp.log(eta))
     log_τ = npyr.deterministic("log_tau", jnp.log(τ))
     return nullhevo
+
 
 def setup_sampler(model, dense_mass=False, target_accept_prob=0.95, num_warmup=500):
     # https://num.pyro.ai/en/latest/mcmc.html
@@ -149,6 +199,7 @@ def setup_sampler(model, dense_mass=False, target_accept_prob=0.95, num_warmup=5
                 chain_method="parallel", progress_bar=True)
     
     return mcmc
+
 
 def render_graph(mcmc, alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info, filename):
     mrhevograph = npyr.render_model(mcmc, model_args=(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info), render_distributions=True, filename=filename)
