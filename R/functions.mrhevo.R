@@ -635,35 +635,35 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
 #' Plot pairs of posterior samples.
 #'
 #' @param fit Stan fit object or mrhevo_numpyro object.
-#' @param pars Vector of parameter names to plot (default c("f", "log_c", "log_tau")).
+#' @param pars Vector of parameter names to plot (default c("theta", "f", "log_tau")).
 #'
 #' @return A ggplot object showing pairs plot.
 #'
-#' @import bayesplot ggplot2
+#' @import bayesplot ggplot2 cowplot
 #' @export
-plot_posterior_pairs <- function(fit, pars = c("f", "log_c", "log_tau")) {
+plot_posterior_pairs <- function(fit, pars = c("theta", "f", "log_tau")) {
     if (inherits(fit, "mrhevo_numpyro")) {
-        post <- convert_to_rstan(fit)
+        # NumPyro output - extract directly from posterior list
+        post <- fit$posterior
         
-        # Get scalar parameters as vectors
-        n <- length(post$theta)
+        # Build data frame for requested parameters
+        df_list <- list()
         
-        # Create data frame for plotting
-        df_plot <- data.frame(
-            theta = post$theta,
-            f = rep(post$f, length.out = n),
-            log_c = rep(post$log_c, length.out = n),
-            log_tau = rep(post$log_tau, length.out = n)
-        )
+        for (p in pars) {
+            if (p %in% names(post)) {
+                vals <- post[[p]]
+                # Flatten to vector
+                df_list[[p]] <- as.vector(vals)
+            }
+        }
         
-        # Select requested parameters
-        df_plot <- df_plot[, colnames(df_plot) %in% pars, drop = FALSE]
+        df_plot <- as.data.frame(df_list)
         
         if (ncol(df_plot) < 2) {
             stop("Need at least 2 parameters for pairs plot")
         }
         
-        # Create pairs plot using cowplot::plot_grid
+        # Create pairs plot using cowplot grid
         plots_list <- list()
         n_pars <- ncol(df_plot)
         
@@ -671,13 +671,13 @@ plot_posterior_pairs <- function(fit, pars = c("f", "log_c", "log_tau")) {
             for (j in 1:n_pars) {
                 if (i == j) {
                     # Diagonal: histogram
-                    p_ij <- ggplot(df_plot, aes_string(x = names(df_plot)[i])) +
+                    p_ij <- ggplot(df_plot, aes(x = .data[[names(df_plot)[i]]])) +
                         geom_histogram(fill = "steelblue", color = "white", bins = 30) +
                         ggplot2::theme_bw() +
                         ggplot2::theme(text = ggplot2::element_text(size = 8))
                 } else if (j < i) {
                     # Lower triangle: scatter plot
-                    p_ij <- ggplot(df_plot, aes_string(x = names(df_plot)[j], y = names(df_plot)[i])) +
+                    p_ij <- ggplot(df_plot, aes(x = .data[[names(df_plot)[j]]], y = .data[[names(df_plot)[i]]])) +
                         geom_point(alpha = 0.2, size = 0.3) +
                         ggplot2::theme_bw() +
                         ggplot2::theme(text = ggplot2::element_text(size = 8))
