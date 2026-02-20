@@ -2,7 +2,7 @@
 
 Mendelian randomization has been widely used to study causal effects of exposures (broadly defined to include behavioural traits, biomarkers and gene expression levels) on diseases.  The biggest methodological challenge is how to infer causality when some of the genetic instruments have direct (pleiotropic) effects on the outcome that are not mediated through the exposure under study.  These pleiotropic effects are not directly observed, and their distribution over the instruments is unknown.
 
-Inference of causal effects can be tackled like any other statistical problem, by computing the likelihood (or posterior distribution) of the parameter of interest (the causal effect) while marginalizing over the distribution of nuisance variables (in this case the pleiotropic effects).  If we can compute the posterior distribution of the parameter of interest, we can obtain the likelihood by dividing by the prior on that parameter.
+Inference of causal effects can be tackled like any other statistical problem, by computing the likelihood (or posterior distribution) of the parameter of interest (the causal effect) while marginalizing over the distribution of nuisance variables (in this case the pleiotropic effects).  If we can compute the posterior distribution of the parameter of interest, we can obtain the likelihood by dividing by the prior on that parameter. There is no need to exclude weak instruments because they are correctly handled by Bayesian inference.
 
 As the form of the distribution of pleiotropic effects over loci is unknown, any realistic statistical model has to specify a prior that encompassses a broad family of symmetric distributions ranging from a spike-and-slab to a Gaussian.  An initial implementation of this approach has been been described by [Berzuini et al (2020)](https://doi.org/10.1093/biostatistics/kxy027).  They specify a horseshoe prior for the pleiotropic effects, and generate the posterior distribution of all model parameters, including the causal effect parameter, by Markov chain Monte Carlo sampling.  An implementation that uses only summary statistics has been described by [Grant and Burgess (2023)](https://doi.org/10.1016/j.ajhg.2023.12.002) as "MR-HORSE.  The methods used in this package differ from MR-HORSE in that: 
 
@@ -12,7 +12,9 @@ As the form of the distribution of pleiotropic effects over loci is unknown, any
 
 3. The marginal likelihood of the causal effect parameter is computed from the posterior and the prior, yielding classical maximum likelihood estimates and _p_-values for the causal effect.
 
-The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are scalar variables calculated from clumps of SNPs that have _trans_- effects on the expression of a gene as transcript or circulating protein.  There is no need to exclude weak instruments because they are correctly handled by Bayesian inference.
+With the example dataset used here, results with MR-HORSE are very similar to results with MR-Hevo. 
+
+The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are scalar variables calculated from clumps of SNPs that have _trans_- effects on the expression of a gene as transcript or circulating protein.  
 
 ## Guide
 
@@ -200,7 +202,7 @@ A scatter plot of the effects of the effects of the instruments on the outcome a
 
 ## Troubleshooting
 
-This package was tested on Ubuntu 24.10 with `gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.2)` and R4.3. This package has not been tested on MacOS or Windows.  Please notify us of any problems. 
+This R package was tested on Ubuntu 24.10, but not yet on MacOS or Windows.  Please notify us of any problems. 
 
 Here we have listed some common errors that you may experience when installing or using the package. Please note this list is not exhaustive.
 
