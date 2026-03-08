@@ -47,7 +47,7 @@ devtools::run_examples()
 
 This example demonstrates how to run MR-Hevo using summary statistics only (no individual-level data required). In the example dataset, the outcome variable is type 2 diabetes and the exposure is plasma levels of adiponectin (encoded by _ADIPOQ_). The instruments are 43 scalar _trans_-QTLs for adiponectin levels.
 
-The default implementation uses NumPyro (Python-based MCMC) via the reticulate package, which is approximately 4x faster than Stan. The Stan implementation gives very similar results.
+The default implementation uses the Python module NumPyro via the reticulate package, which is approximately 4x faster than Stan with the same sampling algorithm. The Stan implementation gives very similar results.  
 
 ```r
 library(mrhevo)
@@ -105,7 +105,7 @@ print(p)
 
 ### Using Stan instead of NumPyro
 
-As an alternative to NumPyro, you can use the Stan implementation. The Stan implementation gives very similar results but is approximately 4x slower.
+As an alternative to NumPyro, you can use the Stan implementation. This is slower, but you may have to use Stan if you have old CPUs that do not support the instruction set required for the JAX library.  
 
 ```r
 library(rstan)
@@ -139,7 +139,7 @@ print(summary(fit_stan, pars = "theta")$summary)
 
 By default, MR-Hevo uses a hierarchical prior on the instrument-exposure effects (alpha): `alpha ~ Normal(mu_alpha, sigma_alpha)` where `mu_alpha` and `sigma_alpha` are learned from the data. This provides additional shrinkage of instrument effects toward a common mean.
 
-You can disable this by setting `hierarchical_alpha = FALSE`, which uses the non-hierarchical prior `alpha ~ Normal(alpha_hat, sd_alpha_hat)`. The hierarchical prior is recommended when instruments are believed to have similar effects on the exposure.
+You can disable this by setting `hierarchical_alpha = FALSE`, which uses the non-hierarchical prior `alpha ~ Normal(alpha_hat, sd_alpha_hat)`. The hierarchical prior is required if you are using the program to estimate the standard error of an estimator from the posterior predictive distribution. 
 
 ### Runtime Comparison
 
