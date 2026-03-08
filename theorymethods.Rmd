@@ -1,5 +1,5 @@
 ---
-title: "MR-Hevo: statistical model and methods"
+title: "MRHevo: statistical model and methods"
 header-includes:
   \usepackage[T1]{fontenc}
   \let\origquote\quote
@@ -14,7 +14,7 @@ header-includes:
 output:
   pdf_document:
     includes:
-      in_header: ~/preamble.tex
+      in_header: ../preamble.tex
   keep_tex: true
   fig_caption: yes
   number_sections: false
@@ -25,7 +25,7 @@ urlcolor: blue
 linenumbers: false
 ---
 
-## Statistical model
+# Statistical model for individual-level genotype-outcome data
 
 \begin{itemize}
 
@@ -46,12 +46,12 @@ linenumbers: false
 \item $\beta0$, $\boldsymbol{\beta_u}$ parameters for intercept and unpenalized covariates $\boldsymbol{X_u}$ 
 \end{itemize} 
 
-We have a dataset of $N$ individuals with measurements of the outcome $Y$ and the genetic instruments $\boldsymbol{Z}$.  From summary statistics we have estimates $\boldsymbol{\hat{\alpha}}$ of the effects $\boldsymbol{\alpha}$ of the instrument on the exposure, with corresponding standard errors $a_1, \dots, a_j$. 
+We have a dataset of $N$ individuals with measurements of the outcome $Y$ and the genetic instruments $\boldsymbol{Z}$.  From summary statistics we have estimates $\boldsymbol{\hat{\alpha}}$ of the effects $\boldsymbol{\alpha}$ of the instrument on the exposure, with corresponding standard errors $s_{\alpha(1)}, \dots, s_{\alpha(J)}$.
 
 We specify a Bayesian full probability model as below
 
 \[
- \alpha_j \sim N \left( \hat{\alpha}_j, a_j^2 \right)
+ \alpha_j \sim \mathcal{N} \left( \hat{\alpha}_j, s_{\alpha(j)}^2 \right)
 \]
 
 
@@ -66,10 +66,12 @@ where $g \left( \right)$ is a link function.
 
 To calculate the likelihood as a function of the causal effect parameter $\theta$, we have to marginalize over the distribution of the direct effects $\boldsymbol{\beta}$ given the data 
 
-The regression coefficients are given a regularized horseshoe prior
+As the form of the distribution of pleiotropic effects over loci is unknown, any realistic statistical model has to specify a prior on these effects that encompassses a broad family of symmetric distributions ranging from a spike-and-slab mixture to a Gaussian.  A convenient model for the direct effects is the horseshoe prior, which is equivalent to a mixture of spike and slab distributions [@carvalho_handling_2009].   This eliminates the computational inconvenience of having to average over all possible partitions of the variables into two disjoint sets (spike-and-slab) as in the contamination mixture model [@burgess_robust_2020] or over different settings of the number of nonzero effect parameters [@xue_constrained_2021].  The horseshoe prior specifies a global shrinkage parameter $\tau$ and $J$ local shrinkage parameters $\lambda_j$.  The regularized horseshoe prior modifies this by specifying a global regularization parameter $\eta$ that controls the size of the largest nonzero effects.
+
+The direct effects are given a regularized horseshoe prior
 
 \[
-\beta_j \sim N \left( 0, \tau^2 \tilde{\lambda}_j^2 \right), \tilde{\lambda}_j^2 = \frac{\eta \lambda_j^2}{\eta + \tau^2 \lambda_j^2}
+\beta_j \sim \mathcal{N} \left( 0, \tau^2 \tilde{\lambda}_j^2 \right), \tilde{\lambda}_j^2 = \frac{\eta^2 \lambda_j^2}{\eta^2 + \tau^2 \lambda_j^2}
 \]
 
 Half-Cauchy priors are specified on the unregularized local scale parameters $\lambda_j$.  
@@ -78,13 +80,17 @@ Half-Cauchy priors are specified on the unregularized local scale parameters $\l
 \lambda_j \sim C^+ \left( 0, 1 \right)
 \]
 
-A weakly informative gamma distribution is specified for $\eta$: 
+A weakly informative prior is specified for the regularization parameter $\eta^2$:
 
 \[
-\eta \sim \textrm{Gamma} \left( 0.5 \nu_{\textrm{slab}}, 0.5 \nu_{\textrm{slab}} s_{\textrm{slab}}^2 \right)
+\eta^2 \sim \textrm{Inverse-Gamma} \left( \frac{\nu_{\textrm{slab}}}{2}, \frac{\nu_{\textrm{slab}} s_{\textrm{slab}}^2}{2} \right)
 \]
 
-The heavy tail of the half-Cauchy distribution allows some of the regression coefficients to escape the shrinkage imposed by the global parameter $\tau$.  The regularization parameter $\eta$ regularizes the scale of the nonzero coefficients (those that are in the slab of the spike and slab distribution).  Even the largest coefficients will be regularized as a Gaussian with variance $\eta$.  
+This translates to a Student $t$ prior with $\nu_{\textrm{slab}}$ degrees of freedom and scale $s_{\textrm{slab}}$ on the largest direct effects.
+
+The horseshoe prior is a multivariate scale mixture of normals: even though there is one local scale parameter for each effect size parameter, these local scale parameters can be integrated out so that the effect parameters are still identifiable [@carvalho_handling_2009]. The heavy tail of the half-Cauchy priors on $\lambda_j$ allows some of the regression coefficients to escape the shrinkage imposed by small values of the global parameter $\tau$.  These nonzero coefficients are the slab component of the spike-and-slab distribution. The value specified for the scale of the global shrinkage parameter $\tau$ encodes an expectation of the fraction of coefficients that are nonzero.
+
+The heavy tail of the half-Cauchy distribution allows some of the regression coefficients to escape the shrinkage imposed by the global parameter $\tau$.  The regularization parameter $\eta$ regularizes the scale of the nonzero coefficients (those that are in the slab of the spike and slab distribution).  Even the largest coefficients will be regularized as a Gaussian with variance $\eta^2$.
 
 The value of $\nu_{\textrm{slab}}$ controls the shape of the distribution of $\eta$.  Piironen and Vehtari recommend setting $\nu_{\textrm{slab}}=1$, but setting $\nu_{\textrm{slab}}=2$ may be required to regularize the sampler so that it does not draw very large values of $\eta$.  
 
@@ -96,41 +102,209 @@ A half-$t$ distribution is chosen for the global scale parameter $\tau$
 \tau \sim t^+ \left( 0, s_{\textrm{global}}, \nu_{\textrm{global}} \right)
 \]
 
-Specifying $\nu_{\textrm{global}}=1$ gives a half-Cauchy prior.  Setting $\nu_{\textrm{aglobal}}=2$ may be required to regularize the sampler so that it does not draw very large values of $\tau$.  This regularization shrinks the right tail of the distribution of $\tau$, and thus limits narrowness of the spike component. 
+Specifying $\nu_{\textrm{global}}=1$ gives a half-Cauchy prior.  Setting $\nu_{\textrm{global}}=2$ may be required to regularize the sampler so that it does not draw very large values of $\tau$.  This regularization shrinks the right tail of the distribution of $\tau$, and thus limits narrowness of the spike component. 
 
-The scaling factor $s_{\textrm{global}}$ is specified to encode a prior guess about the number $r_0$ of nonzero coefficients for the direct effects.  Piironen and Vehtari show that this implies that most of the prior mass for $\tau$ is located near the value 
-
-\[
-	\tau_0 = \frac{r_0}{J - r_0} \frac{\sigma_y}{\sqrt{N}}
-\]
-
-We specify $s_{\textrm{global}}$ so that the median of the prior on $\tau$ is $\tau_0$ calculated as above. 
-
-For the $j$th instrument, the _shrinkage coefficient_ $\kappa_j$ is 
+The scaling factor $s_{\textrm{global}}$ is specified to encode a prior guess $f_0$ about the fraction of nonzero direct effect coefficients, via the formula derived in the next section:
 
 \[
-\kappa_j = \frac{1}{1 + \tilde{\lambda}_j^2}
+	\tau_0 = \frac{f_0}{1 - f_0} \cdot \frac{1}{\sqrt{\mathcal{I}}}
 \]
 
-This takes values from 0 (no shrinkage) to 1 (complete shrinkage).  The prior on this parameter has a horseshoe shape. 
+where $\mathcal{I}$ is the Fisher information about the direct effect coefficient $\beta_j$ from the outcome dataset.  We specify $s_{\textrm{global}}$ so that the median of the prior on $\tau$ is $\tau_0$.
 
-The effective number $m$ of nonzero coefficients is then 
+# Encoding your prior expectation of the effective fraction of nonzero effects
+
+For a coefficient $\beta_j$ with prior $\beta_j \sim \mathcal{N}(0, \tau^2\lambda_j^2)$ and Gaussian likelihood with Fisher information $\mathcal{I}_j$, the posterior mean is a weighted average of zero (the prior mean) and the maximum likelihood estimate $\hat{\beta}_j$:
 
 \[
-m = \sigma{\left( 1 - \kappa_j \right)}
+E[\beta_j \mid \hat{\beta}_j] = \frac{\tau^2\lambda_j^2}{\tau^2\lambda_j^2 + \mathcal{I}_j^{-1}} \hat{\beta}_j = (1-\kappa_j)\hat{\beta}_j
 \]
 
-## Extension to instruments that are calculated from multiple SNPs
+The shrinkage coefficient $\kappa_j$ is the fraction by which the prior shrinks the posterior mean towards zero:
 
-For each clump of exposure-associated SNPs and each individual in the target dataset, a locus-specific score is calculated from the vector $\boldsymbol{\hat{\gamma_u}}$ of univariate summary statistics for the effect of SNPs on the exposure $X$.  Estimates of the multivariable coefficients $\hat{\boldsymbol{\gamma}}$ are calculated by premultiplying the univariate coefficients by the correlation matrix between the SNP genotypes (obtained from a reference population).  Where this correlation matrix is singular or ill-conditioned, a pseudo-inverse can be used to calculate the multivariable coefficients.  
+\[
+\kappa_j = \frac{\mathcal{I}_j^{-1}}{\tau^2\lambda_j^2 + \mathcal{I}_j^{-1}} = \frac{1}{1 + \tau^2\lambda_j^2\mathcal{I}_j}
+\]
 
-The locus-specific score $S$ is then calculated as $\boldsymbol{G} \cdot \boldsymbol{\gamma}$.  
+For the regularized horseshoe, $\lambda_j$ is replaced by the regularized local scale $\tilde{\lambda}_j$:
 
-Because $S$ is calculated from the genotypes and and the coefficients for the effect of genotypes on exposure, we cannot simply substitute it for the genetic instrument $Z$ in the model above. We can however factor the dot product $\boldsymbol{G} \cdot \boldsymbol{\gamma}$ as the product of two scalars: the magnitude of the coefficient vector $\lvert \boldsymbol{\gamma} \rvert$ and a pseudo-genotype $\lvert \boldsymbol{G} \rvert \cos{\phi}$, where $\phi$ is the angle between the vectors $\boldsymbol{G}$ and $\boldsymbol{\gamma}$. We can then substitute $\lvert \boldsymbol{\gamma} \rvert$ for the scalar coefficient $\alpha$ and $S / \lvert \boldsymbol{\gamma} \rvert$ for the scalar instrument $Z$ as a pseudo-genotype in the statistical model defined above.  
+\[
+\kappa_j = \frac{1}{1 + \tau^2\tilde{\lambda}_j^2\mathcal{I}_j}
+\]
+
+The shrinkage coefficients can take values from 0 (no shrinkage) to 1 (complete shrinkage), and the prior on each $\kappa_j$ has a horseshoe shape.  Calculation of the shrinkage coefficients does not affect the statistical results but is helpful for interpretation.
+
+The effective fraction $f$ of nonzero coefficients is
+
+\[
+f = \frac{1}{J}\sum_{j=1}^J{\left( 1 - \kappa_j \right)}
+\]
+
+To obtain the prior expectation of $f$, we compute $E[1 - \kappa_j \mid \tau]$ by averaging over the half-Cauchy prior $\lambda_j \sim C^+(0,1)$, which has density $p(\lambda) = \frac{2}{\pi(1+\lambda^2)}$ for $\lambda > 0$.  The derivation is exact for the standard horseshoe; for the regularized horseshoe it is a good approximation because the regularization mainly affects the slab (large $\lambda_j$) component, while the spike component that determines the degree of shrinkage when $\tau$ is small is unchanged.
+
+Setting $a = \tau^2 \mathcal{I}_j$:
+
+\[
+E[1 - \kappa_j \mid \tau] = \int_0^\infty \frac{a\lambda^2}{1+a\lambda^2} \cdot \frac{2}{\pi(1+\lambda^2)} \, d\lambda
+= \frac{2}{\pi} \int_0^\infty \frac{a\lambda^2}{(1+a\lambda^2)(1+\lambda^2)} \, d\lambda
+\]
+
+We split the integrand:
+
+\[
+\frac{a\lambda^2}{(1+a\lambda^2)(1+\lambda^2)} = \frac{1}{1+\lambda^2} - \frac{1}{(1+a\lambda^2)(1+\lambda^2)}
+\]
+
+Partial fractions on the second term (for $a \neq 1$):
+
+\[
+\frac{1}{(1+a\lambda^2)(1+\lambda^2)} = \frac{1}{a-1}\left[\frac{a}{1+a\lambda^2} - \frac{1}{1+\lambda^2}\right]
+\]
+
+Integrating over $[0, \infty)$ using $\int_0^\infty \frac{d\lambda}{1+b\lambda^2} = \frac{\pi}{2\sqrt{b}}$:
+
+\[
+\int_0^\infty \frac{d\lambda}{(1+a\lambda^2)(1+\lambda^2)}
+= \frac{1}{a-1}\left[\frac{\pi\sqrt{a}}{2} - \frac{\pi}{2}\right]
+= \frac{\pi}{2} \cdot \frac{\sqrt{a}-1}{a-1}
+= \frac{\pi}{2(1+\sqrt{a})}
+\]
+
+where the last step uses $(\sqrt{a}-1)/(a-1) = 1/(1+\sqrt{a})$.  Combining:
+
+\[
+\int_0^\infty \frac{a\lambda^2}{(1+a\lambda^2)(1+\lambda^2)} \, d\lambda
+= \frac{\pi}{2} - \frac{\pi}{2(1+\sqrt{a})}
+= \frac{\pi\sqrt{a}}{2(1+\sqrt{a})}
+\]
+
+Therefore:
+
+\[
+E[1 - \kappa_j \mid \tau] = \frac{2}{\pi} \cdot \frac{\pi\sqrt{a}}{2(1+\sqrt{a})} = \frac{\sqrt{a}}{1+\sqrt{a}} = \frac{\tau\sqrt{\mathcal{I}_j}}{1+\tau\sqrt{\mathcal{I}_j}}
+\]
+
+The prior expectation of $f$ is then:
+
+\[
+\mathbb{E}\langle f \mid \tau \rangle = \frac{1}{J}\sum_{j=1}^J \frac{\tau\sqrt{\mathcal{I}_j}}{1+\tau\sqrt{\mathcal{I}_j}}
+\]
+
+The information $\mathcal{I}_j$ about $\beta_j$ depends on the sample sizes in the studies from which the summary statistics $\hat{\alpha}_j$ and $\hat{\gamma}_j$ were obtained.  At $\theta = 0$, $\beta_j = \gamma_j$ and $\mathcal{I}_j$ is asymptotically equivalent to the inverse variance of the maximum likelihood estimate of $\gamma_j$, so $\mathcal{I}_j = s_{\gamma(j)}^{-2}$.
+
+We set $s_{\textrm{global}}$ so that the median of the prior on $\tau$ equals $\tau_0$, defined as the value satisfying $\mathbb{E}\langle f \mid \tau_0 \rangle = f_0$, where $f_0$ is the prior guess at the fraction of nonzero direct effects.  
+
+Assuming equal information $\mathcal{I}_j = \mathcal{I}$ across instruments and solving:
+
+\[
+f_0 = \frac{\tau_0\sqrt{\mathcal{I}}}{1+\tau_0\sqrt{\mathcal{I}}}
+\]
+
+Rearranging:
+
+\[
+f_0\left(1 + \tau_0\sqrt{\mathcal{I}}\right) = \tau_0\sqrt{\mathcal{I}}
+\implies f_0 = (1 - f_0)\tau_0\sqrt{\mathcal{I}}
+\implies \tau_0 = \frac{f_0}{1-f_0} \cdot \frac{1}{\sqrt{\mathcal{I}}}
+\]
+
+For linear regression with $N$ observations, residual variance $\sigma_y^2$, and standardized instruments ($\textrm{Var}(Z_j)=1$), the Fisher information is $\mathcal{I} = N/\sigma_y^2$, recovering the formula $\tau_0 = \frac{f_0}{1-f_0}\frac{\sigma_y}{\sqrt{N}}$ of Piironen and Vehtari.  
+
+Where the information is not equal across instruments, we can solve numerically for $\tau_0$. 
+
+For a general model, Piironen and Vehtari use the term _pseudovariance_ for the inverse Fisher information per observation; $1/\sqrt{\mathcal{I}}$ is the corresponding pseudostandard deviation, equal to the standard error of the maximum likelihood estimate of $\gamma_j$.  With more information (larger $\mathcal{I}$), a smaller $\tau$ is required to encode the same prior expectation of $f$ [@piironen_sparsity_2017].
+
+# Extension to summary-level genotype-outcome data
+
+Most 2-sample MR studies rely entirely on summary-level data.  Even if an individual-level dataset is available, it is computationally faster to use summary statistics from that dataset than to model the individual-level data.  
+
+For a Mendelian randomization study of a single exposure with $J$ unlinked genetic instruments, we specify a model with two vector-valued parameters and one scalar parameter:
+
+\begin{itemize}
+
+\item $\boldsymbol{\alpha}$ vector of coefficients of effects of the instruments on exposure $X$,
+
+\item $\boldsymbol{\beta}$ vector of coefficients of direct (pleiotropic) effects of the instruments on outcome $Y$,
+
+\item $\theta$ causal effect of $X$ on $Y$.
+
+\end{itemize}
+
+The crude effect of the $j$th instrument on the outcome is the sum of the direct effect and the effect through the exposure:
+
+\[
+ \gamma_j = \beta_j + \theta \alpha_j
+\]
+
+As the instruments are unlinked, we can model the coefficient estimates $\hat{\gamma}_j, \hat{\alpha}_j$ as independent Gaussian variables conditional on the true values:
+
+\[
+ \hat{\alpha}_j \sim \mathcal{N} \left( \alpha_j, s_{\alpha \left( j \right) }^2 \right)
+\]
+
+\[
+ \hat{\gamma}_j \sim \mathcal{N} \left( \gamma_j, s_{\gamma\left( j \right) }^2 \right)
+\]
+
+With priors on $\theta$ and $\boldsymbol{\beta}$, we can specify a full Bayesian probability model, and sample from the joint posterior distribution over the direct effects $\beta_j$, the instrument-exposure effects $\alpha_j$, and the causal effect $\theta$, given the maximum likelihood estimates $\hat{\alpha}_j, \hat{\gamma}_j$ and their standard errors $s_{\gamma_j}, s_{\alpha_j}$.
+
+
+The prior for the direct effects $\beta_1, \dots, \beta_J$ is 
+
+\[
+\beta_j \sim \mathcal{N} \left( 0, \tau^2 \tilde{\lambda}_j^2 \right),\enspace \tilde{\lambda}_j^2 = \frac{\eta^2 \lambda_j^2}{\eta^2 + \tau^2 \lambda_j^2}
+\]
+
+Half-Cauchy priors are specified on the local scale parameters $\lambda_j$, and a half-$t$ prior is specified on the global scale parameter $\tau$:
+
+\[
+\lambda_j \sim C^+ \left( 0, 1 \right),\enspace  \tau \sim t^+ \left( 0, s_{\textrm{global}}, \nu_{\textrm{global}} \right)
+\]
+
+
+# Constructing scalar instruments from multiple SNPs
+Standard methods for 2SMR require as input data an estimate of two scalar quantities for each unlinked instrument: the instrument-exposure coefficient and the instrument-outcome coefficient.  We describe below how to combine multiple SNPs from a given region into a single instrument and calculate a scalar coefficient for the effect of this new instrument on the exposure given univariate summary statistics for the association of each SNP with the exposure.
+
+From summary statistics we obtain a table of exposure-associated SNPs with regression coefficients and standard errors, filtered by _p_-value.  After ordering by genomic position, we can group the SNPs into regions such that no gap between adjacent SNPs in the same region exceeds $L$ Mb, and each gap greater than $L$ Mb defines a new region.  We use the term "locus" for a region that contains SNPs associated with the exposure at a given _p_-value threshold.  For each locus, we calculate multivariable coefficient estimates $\boldsymbol{\hat{\alpha}_m}$ by multiplying the vector of univariate coefficient estimates $\boldsymbol{\hat{\alpha}_u}$ by the inverse of the correlation matrix $\boldsymbol{\Sigma_g}$ between the SNP genotypes.
+
+\[
+\boldsymbol{\hat{\alpha}_m} = \boldsymbol{\Sigma_g^{-1}} \boldsymbol{\hat{\alpha}_u}
+\]
+
+The correlation matrix $\boldsymbol{\Sigma_g}$ is obtained from a reference panel such as 1000 Genomes.  A shrinkage penalty (equivalent to ridge regression) can be imposed by adding a penalty factor to the diagonal elements of $\boldsymbol{\Sigma_g}$.  Where the correlation matrix is singular or ill-conditioned, a pseudo-inverse solution is used to calculate the multivariable coefficients.  For an individual with genotypes $\boldsymbol{g}$ at the exposure-associated SNPs in a locus, a locus-specific score $S$ predicting the exposure is calculated as $\boldsymbol{g}^\top \cdot \boldsymbol{\hat{\alpha}_m}$.
+
+Because the score $S$ is calculated from the genotypes and the genotype-exposure coefficients, we cannot use it as a genotypic instrument for the exposure (the instrument-exposure coefficient is incorporated in the score).  We can however construct a genotypic instrument by factoring the dot product $\boldsymbol{g}^\top \cdot \boldsymbol{\hat{\alpha}_m}$ as the product of two scalars (using the definition of the dot product of two Euclidean vectors): the magnitude of the multivariable coefficient vector $\lVert \boldsymbol{\hat{\alpha}_m} \rVert$ and a pseudo-genotype $\lVert \boldsymbol{g} \rVert \rho_{\boldsymbol{g}, \boldsymbol{\hat{\alpha}_m}}$, where $\rho_{\boldsymbol{g}, \boldsymbol{\hat{\alpha}_m}}$ is the correlation between $\boldsymbol{g}$ and $\boldsymbol{\hat{\alpha}_m}$, geometrically equivalent to the cosine of the angle between these vectors. The pseudo-genotype $\lVert \boldsymbol{g} \rVert \rho_{\boldsymbol{g}, \boldsymbol{\hat{\alpha}_m}}$ can be thought of as the projection of the genotype vector $\boldsymbol{g}$ on to the exposure effects vector $\boldsymbol{\hat{\alpha}_m}$, while $\lVert \boldsymbol{\hat{\alpha}_m} \rVert$ is the magnitude of the effect on the exposure.  We can then substitute the pseudo-genotype $\lVert \boldsymbol{g} \rVert \rho_{\boldsymbol{g}, \boldsymbol{\hat{\alpha}_m}} = S / \lVert \boldsymbol{\hat{\alpha}_m} \rVert$ for the scalar instrument $Z$ and $\lVert \boldsymbol{\hat{\alpha}_m} \rVert$ for the scalar coefficient estimate $\hat{\alpha}$ in the statistical model.  The derived coefficient for the estimated effect of the instrument $Z$ on the exposure $X$ is always positive; flipping the coding of the alleles would flip the sign of $\rho_{\boldsymbol{g}, \boldsymbol{\hat{\alpha}_m}}$.  We can calculate the standard error of $\hat{\alpha}$ as $1 / \sqrt{\mathcal{I}_\alpha}$ where $\mathcal{I}_{\alpha}$ is the Fisher information about the slope of the linear regression of $X$ on $Z$, given by
+
+\[
+\mathcal{I}_{\alpha} = N_{\alpha} \frac{\textrm{Var} \left( Z \right) }{\sigma_X^2 - \hat{\alpha}^2 \textrm{Var} \left( Z \right) }
+\]
+
+where $N_{\alpha}$ is the sample size of the study from which the estimated univariate coefficients $\boldsymbol{\hat{\alpha}_u}$ were obtained, $\textrm{Var} \left( Z \right)$ is the variance of the scalar instrument $Z$ estimated in a reference panel, and $\sigma_X^2$ is the variance of the exposure $X$.  If an estimate of $\sigma_X^2$ is not given with the summary statistics for SNP-exposure associations, it can be calculated from the allele frequency $p_j$ of the $j$th SNP, the standard error $s_{g_j}$ of the $j$th univariate coefficient estimate $\hat{\alpha}_{u_j}$, and the sample size $N_{\alpha}$ as
+
+\[
+\sigma_X^2 = 2 p_j \left( 1 - p_j \right) \left( N_{\alpha} s_{g_j}^2 + \hat{\alpha}_{u_j}^2 \right)
+\] 
 
 This procedure ensures that all exposure-associated SNPs can be used in constructing the genotypic instruments, and that these instruments are unlinked so that their pleiotropic effects can be modelled as independent.  
 
-## Computational methods
-To generate the posterior distribution given the model and the data, we use the program `Stan`.  Scripts for a linear regression (continuous outcome) and a logistic regression (binary outcome) are [here](https://github.com/molepi-precmed/mrhevo).  
+## Estimation of instrument-outcome coefficients from summary level data
+Where an individual-level dataset for genotype-outcome associations is available, the instrument-outcome coefficients for scalar instruments constructed from multiple SNPs can be estimated by fitting regression models for the effect of each instrument on the outcome.  Where only summary-level data are available for the genotype-outcome associations, it is possible to obtain an estimate $\hat{\gamma}$ of the coefficient for the effect of the scalar instrument $Z$ on the outcome and its standard error, using individual-level genotype data from a reference panel of individual with similar ancestry to that in the genotype-outcome dataset, such as 1000 Genomes.  Although we have not used this method, we give a brief derivation for completeness.  First, the vector $\boldsymbol{\hat{\gamma}_m}$ of estimated multivariable coefficients is calculated by premultiplying the estimates $\boldsymbol{\hat{\gamma}_u}$ of the univariate coefficients by $\boldsymbol{\Sigma_G^{-1}}$. The coefficient $\hat{\gamma}$ for the scalar instrument $Z$ is then estimated by minimizing the sum of the squared differences between the predictor calculated from $Z$ and the linear predictor calculated from the vector of genotypes $\boldsymbol{G}$, where the sum is taken over the genotypes of all $n$ individuals in the reference panel.  
 
-The likelihood from the posterior distribution of $\theta$ by dividing by the prior. This is done by fitting a kernel density to the posterior samples of $\theta$, weighting each observation by the inverse of the prior.  We take the logarithm of this likelihood, and fit a quadratic function to the log-likelihood function.  The maximum likelihood estimate and test of the null hypothesis $\theta=0$ are obtained from this quadratic approximation to the log-likelihoood. 
+\[
+\sum_{i=1}^n \left( \gamma Z_i - \boldsymbol{G}_i \cdot \boldsymbol{\hat{\gamma}_m} \right)^2
+\]
+
+Equating to zero the derivative of this expression with respect to $\gamma$, substituting $\lVert \boldsymbol{G_i} \rVert \rho_{G, \boldsymbol{\hat{\alpha}_m}}$ for $Z_i$ and factoring the dot product $\boldsymbol{G}_i \cdot \boldsymbol{\hat{\gamma}_m}$ as $\lVert \boldsymbol{G}_i \rVert \rho_{\boldsymbol{G}_i, \boldsymbol{\hat{\gamma}_m}} \lVert \boldsymbol{\hat{\gamma}_m} \rVert$ we obtain
+\[
+\hat{\gamma} = \lVert \boldsymbol{\hat{\gamma}_m} \rVert \frac{\sum_{i=1}^n \rho_{\boldsymbol{G}_i, \boldsymbol{\hat{\gamma}_m}} \lVert \boldsymbol{G}_i \rVert^2 \rho_{G_i, \boldsymbol{\hat{\alpha}_m}}}{\sum_{i=1}^n \lVert \boldsymbol{G_i} \rVert^2 \rho_{G_i, \boldsymbol{\hat{\alpha}_m}}^2}
+\]
+
+The ratio in this expression can be recognized as a weighted average of the ratio $\rho_{G_i, \boldsymbol{\hat{\gamma}_m}} / \rho_{G_i, \boldsymbol{\hat{\alpha}_m}}$, with weights $Z_i^2$.  The standard error of $\hat{\gamma}$ is $1 / \sqrt{\mathcal{I}_\gamma}$ where $\mathcal{I}_{\gamma}$ is the Fisher information on the slope of the regression of $Y$ on $Z$, given (for a logistic regression model) by 
+
+\[
+\mathcal{I}_{\gamma} = N_{\gamma} \textrm{Var} \left( Z \right) p \left( 1 - p \right) 
+\]
+
+where $N_{\gamma}$ and $p$ are respectively the total sample size and the proportion of cases in the dataset from which the coefficient estimates $\boldsymbol{\hat{\gamma}_u}$ were obtained. 
+
+
