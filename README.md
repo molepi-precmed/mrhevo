@@ -168,6 +168,7 @@ theta     -0.337     0.0014    0.051     -0.436     -0.338     -0.233    1390   
 <img src="./posterior_pairs_plot.png" width="500" />
 
 **Histogram of kappa shrinkage coefficients:**
+The histogram of shrinkage coefficients shows a horseshoe shape.  Where the direct effect of the instrument on the outcome is inferred to be large, it escapes shrinkage (kappa = 0).  Where the direct effect of the instrument is inferred to be small, it is shrunk nearly to zero (kappa = 1). 
 
 <img src="./kappa_hist_plot.png" width="500" />
 
