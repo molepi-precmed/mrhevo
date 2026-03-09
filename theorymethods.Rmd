@@ -23,6 +23,7 @@ output:
 always_allow_html: true
 urlcolor: blue
 linenumbers: false
+bibliography: mr.bib
 ---
 
 # Statistical model for individual-level genotype-outcome data
@@ -66,9 +67,7 @@ where $g \left( \right)$ is a link function.
 
 To calculate the likelihood as a function of the causal effect parameter $\theta$, we have to marginalize over the distribution of the direct effects $\boldsymbol{\beta}$ given the data 
 
-As the form of the distribution of pleiotropic effects over loci is unknown, any realistic statistical model has to specify a prior on these effects that encompassses a broad family of symmetric distributions ranging from a spike-and-slab mixture to a Gaussian.  A convenient model for the direct effects is the horseshoe prior, which is equivalent to a mixture of spike and slab distributions [@carvalho_handling_2009].   This eliminates the computational inconvenience of having to average over all possible partitions of the variables into two disjoint sets (spike-and-slab) as in the contamination mixture model [@burgess_robust_2020] or over different settings of the number of nonzero effect parameters [@xue_constrained_2021].  The horseshoe prior specifies a global shrinkage parameter $\tau$ and $J$ local shrinkage parameters $\lambda_j$.  The regularized horseshoe prior modifies this by specifying a global regularization parameter $\eta$ that controls the size of the largest nonzero effects.
-
-The direct effects are given a regularized horseshoe prior
+As the form of the distribution of pleiotropic effects over loci is unknown, any realistic statistical model has to specify a prior on these effects that encompassses a broad family of symmetric distributions ranging from a spike-and-slab mixture to a Gaussian.  A convenient model for the direct effects is the horseshoe prior, which is equivalent to a mixture of spike-and-slab distributions [@carvalho_handling_2009].   This eliminates the computational inconvenience of having to average over all possible partitions of the variables into two disjoint sets (spike, slab) as in the contamination mixture model [@burgess_robust_2020] or over different settings of the number of nonzero effect parameters [@xue_constrained_2021].  The horseshoe prior specifies a global shrinkage parameter $\tau$ and $J$ local shrinkage parameters $\lambda_j$.  The regularized horseshoe prior modifies this by specifying a global regularization parameter $\eta$ that controls the size of the largest nonzero effects.
 
 \[
 \beta_j \sim \mathcal{N} \left( 0, \tau^2 \tilde{\lambda}_j^2 \right), \tilde{\lambda}_j^2 = \frac{\eta^2 \lambda_j^2}{\eta^2 + \tau^2 \lambda_j^2}
@@ -92,9 +91,9 @@ The horseshoe prior is a multivariate scale mixture of normals: even though ther
 
 The heavy tail of the half-Cauchy distribution allows some of the regression coefficients to escape the shrinkage imposed by the global parameter $\tau$.  The regularization parameter $\eta$ regularizes the scale of the nonzero coefficients (those that are in the slab of the spike and slab distribution).  Even the largest coefficients will be regularized as a Gaussian with variance $\eta^2$.
 
-The value of $\nu_{\textrm{slab}}$ controls the shape of the distribution of $\eta$.  Piironen and Vehtari recommend setting $\nu_{\textrm{slab}}=1$, but setting $\nu_{\textrm{slab}}=2$ may be required to regularize the sampler so that it does not draw very large values of $\eta$.  
+The value of $\nu_{\textrm{slab}}$ (set in `MRHevo` with the argument `slab_df`) controls the shape of the prior distribution of $\eta$.  Piironen and Vehtari recommend setting $\nu_{\textrm{slab}}=1$ which is equivalent to a Cauchy prior on $\eta$.  This allows $\eta$ to take very large values, which is not realistic in the setting of polygenic effects on a complex trait.  It also leads to awkward posterior geometry: in the region of the posterior where $\eta$ is large and $\tau$ is very small, funnelling occurs.  This is evident as divergent transitions with the NUTS sampler.  By default, MRHevo sets $\nu_{\textrm{slab}} = 2$.  Larger values may be required to regularize the sampler so that it does not draw very large values of $\eta$.  
 
-The scaling factor $s_{\textrm{slab}}$ is specified based on prior information about the size of the largest direct effects.  This information will usually be available from genome-wide association studies of the outcome.  
+The scaling factor $s_{\textrm{slab}}$ (set in `MRHevo` with the argument `slab_scale`) is specified based on prior information about the size of the largest direct effects.  This information will usually be available from genome-wide association studies of the outcome.  
 
 A half-$t$ distribution is chosen for the global scale parameter $\tau$
 
@@ -102,17 +101,11 @@ A half-$t$ distribution is chosen for the global scale parameter $\tau$
 \tau \sim t^+ \left( 0, s_{\textrm{global}}, \nu_{\textrm{global}} \right)
 \]
 
-Specifying $\nu_{\textrm{global}}=1$ gives a half-Cauchy prior.  Setting $\nu_{\textrm{global}}=2$ may be required to regularize the sampler so that it does not draw very large values of $\tau$.  This regularization shrinks the right tail of the distribution of $\tau$, and thus limits narrowness of the spike component. 
+Specifying $\nu_{\textrm{global}}=1$ gives a half-Cauchy prior.  
 
-The scaling factor $s_{\textrm{global}}$ is specified to encode a prior guess $f_0$ about the fraction of nonzero direct effect coefficients, via the formula derived in the next section:
+The scaling factor $s_{\textrm{global}}$ is not set directly by the user.  Instead the user specifies a prior guess $f_0$ (set in `MRHevo` with the argument `fraction_pleio`) about the fraction of nonzero direct effect coefficients.  This setting depends upon $\mathcal{I}$, the Fisher information about the direct effect coefficient $\beta_j$, which in turn depends on the size of the outcome dataset.  MRHevo calculates the setting of $s_{\textrm{global}}$ from the Fisher information and the value of $f_0$ specified by the user, so that that the median $\tau_0$ of the prior on $\tau$ is the value at which the fraction of nonzero coefficients is $f_0$.
 
-\[
-	\tau_0 = \frac{f_0}{1 - f_0} \cdot \frac{1}{\sqrt{\mathcal{I}}}
-\]
-
-where $\mathcal{I}$ is the Fisher information about the direct effect coefficient $\beta_j$ from the outcome dataset.  We specify $s_{\textrm{global}}$ so that the median of the prior on $\tau$ is $\tau_0$.
-
-# Encoding your prior expectation of the effective fraction of nonzero effects
+# Encoding the prior expectation of the effective fraction of nonzero effects
 
 For a coefficient $\beta_j$ with prior $\beta_j \sim \mathcal{N}(0, \tau^2\lambda_j^2)$ and Gaussian likelihood with Fisher information $\mathcal{I}_j$, the posterior mean is a weighted average of zero (the prior mean) and the maximum likelihood estimate $\hat{\beta}_j$:
 
@@ -214,8 +207,7 @@ Where the information is not equal across instruments, we can solve numerically 
 
 For a general model, Piironen and Vehtari use the term _pseudovariance_ for the inverse Fisher information per observation; $1/\sqrt{\mathcal{I}}$ is the corresponding pseudostandard deviation, equal to the standard error of the maximum likelihood estimate of $\gamma_j$.  With more information (larger $\mathcal{I}$), a smaller $\tau$ is required to encode the same prior expectation of $f$ [@piironen_sparsity_2017].
 
-# Extension to summary-level genotype-outcome data
-
+# Extension to summary-level data
 Most 2-sample MR studies rely entirely on summary-level data.  Even if an individual-level dataset is available, it is computationally faster to use summary statistics from that dataset than to model the individual-level data.  
 
 For a Mendelian randomization study of a single exposure with $J$ unlinked genetic instruments, we specify a model with two vector-valued parameters and one scalar parameter:
@@ -249,7 +241,7 @@ As the instruments are unlinked, we can model the coefficient estimates $\hat{\g
 With priors on $\theta$ and $\boldsymbol{\beta}$, we can specify a full Bayesian probability model, and sample from the joint posterior distribution over the direct effects $\beta_j$, the instrument-exposure effects $\alpha_j$, and the causal effect $\theta$, given the maximum likelihood estimates $\hat{\alpha}_j, \hat{\gamma}_j$ and their standard errors $s_{\gamma_j}, s_{\alpha_j}$.
 
 
-The prior for the direct effects $\beta_1, \dots, \beta_J$ is 
+As in the model for individual-level data, the prior for the direct effects $\beta_1, \dots, \beta_J$ is 
 
 \[
 \beta_j \sim \mathcal{N} \left( 0, \tau^2 \tilde{\lambda}_j^2 \right),\enspace \tilde{\lambda}_j^2 = \frac{\eta^2 \lambda_j^2}{\eta^2 + \tau^2 \lambda_j^2}
@@ -263,7 +255,7 @@ Half-Cauchy priors are specified on the local scale parameters $\lambda_j$, and 
 
 
 # Constructing scalar instruments from multiple SNPs
-Standard methods for 2SMR require as input data an estimate of two scalar quantities for each unlinked instrument: the instrument-exposure coefficient and the instrument-outcome coefficient.  We describe below how to combine multiple SNPs from a given region into a single instrument and calculate a scalar coefficient for the effect of this new instrument on the exposure given univariate summary statistics for the association of each SNP with the exposure.
+Standard methods for two-sample Mendelian randomization require as input data an estimate of two scalar quantities for each unlinked instrument: the instrument-exposure coefficient and the instrument-outcome coefficient.  We describe below how to combine multiple SNPs from a given region into a single instrument and calculate a scalar coefficient for the effect of this new instrument on the exposure given univariate summary statistics for the association of each SNP with the exposure.
 
 From summary statistics we obtain a table of exposure-associated SNPs with regression coefficients and standard errors, filtered by _p_-value.  After ordering by genomic position, we can group the SNPs into regions such that no gap between adjacent SNPs in the same region exceeds $L$ Mb, and each gap greater than $L$ Mb defines a new region.  We use the term "locus" for a region that contains SNPs associated with the exposure at a given _p_-value threshold.  For each locus, we calculate multivariable coefficient estimates $\boldsymbol{\hat{\alpha}_m}$ by multiplying the vector of univariate coefficient estimates $\boldsymbol{\hat{\alpha}_u}$ by the inverse of the correlation matrix $\boldsymbol{\Sigma_g}$ between the SNP genotypes.
 
@@ -305,6 +297,6 @@ The ratio in this expression can be recognized as a weighted average of the rati
 \mathcal{I}_{\gamma} = N_{\gamma} \textrm{Var} \left( Z \right) p \left( 1 - p \right) 
 \]
 
-where $N_{\gamma}$ and $p$ are respectively the total sample size and the proportion of cases in the dataset from which the coefficient estimates $\boldsymbol{\hat{\gamma}_u}$ were obtained. 
+where $N_{\gamma}$ and $p$ are respectively the total sample size and the proportion of cases in the dataset from which the coefficient estimates $\boldsymbol{\hat{\gamma}_u}$ were obtained.
 
-
+# References
