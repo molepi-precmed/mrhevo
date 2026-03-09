@@ -130,9 +130,9 @@ fit_stan <- run_mrhevo.sstats(
 print(summary(fit_stan, pars = "theta")$summary)
 ```
 
-**Note on sampling warnings:** If you see warnings about divergent transitions, this indicates sampling difficulties. To address this:
+**Note on sampling warnings:** If you see warnings about divergent transitions, this indicates sampling difficulties, usually where the regularization parameter takes large values and the global shrinkage parameter compensates for this by taking small values.  This creates a funnel in the posterior, which the NUTS sampler cannot easily handle.  To address this:
 - Reduce `slab_scale` (try 0.1 or 0.05)
-- Increase `slab_df` (try 4 or 8)
+- Increase `slab_df` (try 3 or 4)
 - Increase the number of warmup iterations
 
 ### About the hierarchical prior on alpha
