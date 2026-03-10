@@ -37,7 +37,7 @@ pnorm.extreme <- function(z, upper=TRUE) {
     c <- ifelse(upper, 8 / pi, 4)
 
     x <-  2 * sqrt(2 / pi) / (z + sqrt(z^2 + c))
-    ln_p = -0.5 * z^2 + log(x)
+    ln_p <- -0.5 * z^2 + log(x)
     log10p <- ln_p / log(10)
     exponent <- floor(log10p)
     coeff <- 10^(log10p - exponent)
@@ -109,11 +109,10 @@ format.z.aspvalue <- function(z, sigfig=1, neglogp.threshold.scinot=3,
 #'
 #' @export
 get_summarystatsforMR <- function(Y, Z, X_u) {
-    # registerDoParallel(cores=10)
     YXZ.dt <- data.table(y=Y, Z, X_u)
     ## loop over instruments to fit regression of Y on Z, adjusted for X_u
     ## FIXME: implement a score test or parallelize
-    coeffs <- foreach(i = 1:ncol(Z),
+    coeffs <- foreach(i = seq_len(ncol(Z)),
                       .combine=function(...) rbind(..., fill=TRUE),
                       .multicombine=TRUE) %dopar% {
 
@@ -196,7 +195,8 @@ get_estimatorsMR <- function(coeffs.dt) {
 #'         test statistic, p-value, formatted p-value. Otherwise, create a plot
 #'         of posterior density and log-likelihood.
 #'
-#' @import cowplot car
+#' @import cowplot
+#' @importFrom car recode
 #' @export
 mle.se.pval <- function(x, prior, return.asplot=FALSE) {
     invprior <- 1 / prior
@@ -215,9 +215,10 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
 
     ## possible refinement would be to weight the regression that is used to fit
     ## the quadratic approximation:
+    ## log-lik is quadratic: y = -a * x^2 + b*x; mle = b/2a, se = sqrt(1/2a)
     fit.quad <- lm(logl ~ xvals + xvals.sq)
-    a <- -as.numeric(fit.quad$coefficients[3]) # y = -a * x^2 + bx
-    b <- as.numeric(fit.quad$coefficients[2]) # mle b/2a, se sqrt(1/2a)
+    a <- -as.numeric(fit.quad$coefficients[3])
+    b <- as.numeric(fit.quad$coefficients[2])
     mle <- 0.5 * b / a
     stderr <- sqrt(0.5 / a)
     z <- mle / stderr
@@ -288,16 +289,22 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
 #'
 #' @example man/examples/runmrhevo.R
 #' @export
-#' @import data.table rstan ggplot2 bayesplot
+#' @import data.table ggplot2
 run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
                        Z, Y, sigma_y=1, X_u, alpha_hat, se.alpha_hat,
                        fraction_pleio=NULL, slab_scale=0.25, priorsd_theta=1,
-                       vb.algo="meanfield", model.dir) {
-    rstan_options(auto_write = TRUE)
+                       vb.algo="meanfield",
+                       model.dir=system.file("stan", package="mrhevo")) {
+    if (!requireNamespace("rstan", quietly=TRUE)) {
+        stop("The Stan backend requires the 'rstan' package. ",
+             "Run install_mrhevo_stan() to install it.")
+    }
+    rstan::rstan_options(auto_write=TRUE)
 
     msg(bold, "Compiling stan model ... ")
-    mr.stanmodel <- stan_model(file=file.path(model.dir, "MRHevo_logistic.stan"),
-                               model_name="MRHevo.logistic", verbose=FALSE)
+    mr.stanmodel <- rstan::stan_model(
+        file=file.path(model.dir, "MRHevo_logistic.stan"),
+        model_name="MRHevo.logistic", verbose=FALSE)
     msg(note, "Done.\n")
 
     ## check arguments for consistency
@@ -371,7 +378,7 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
                     scale_beta_u=scale_beta_u,
                     priorsd_theta=priorsd_theta,
                     slab_scale=slab_scale,
-                    slab_df=slab_df, priorsd_theta=priorsd_theta)
+                    slab_df=slab_df)
 
     if (use.sampling) {
         fit.mc <- rstan::sampling(object=mr.stanmodel,
@@ -413,17 +420,21 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
 #' @export
 run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                               fraction_pleio=NULL, slab_scale=0.2, slab_df=2,
-                              priorsd_theta=1, model.dir,
-                              hierarchical_alpha = TRUE) {
-    require(rstan)
-    options(mc.cores = parallel::detectCores())
-    rstan_options(auto_write = TRUE)
+                              priorsd_theta=1,
+                              model.dir=system.file("stan", package="mrhevo"),
+                              hierarchical_alpha=TRUE) {
+    if (!requireNamespace("rstan", quietly=TRUE)) {
+        stop("The Stan backend requires the 'rstan' package. ",
+             "Run install_mrhevo_stan() to install it.")
+    }
+    options(mc.cores=parallel::detectCores())
+    rstan::rstan_options(auto_write=TRUE)
 
     msg(bold, "Compiling stan model ... ")
-    mr.sstats.stanmodel <- stan_model(file=file.path(model.dir,
-                                                     "MRHevo_summarystats.stan"),
-                                      model_name="MRHevo.summarystats",
-                                      verbose=FALSE)
+    mr.sstats.stanmodel <- rstan::stan_model(
+        file=file.path(model.dir, "MRHevo_summarystats.stan"),
+        model_name="MRHevo.summarystats",
+        verbose=FALSE)
     msg(note, "Done.\n")
 
     ## check arguments for consistency
@@ -437,7 +448,7 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
     gamma_hat^2 * se.alpha_hat^2 / alpha_hat^4
 
     ## mean Fisher info for IV estimate
-    info <- mean( 1 / var.theta_IV_delta)
+    info <- mean(1 / var.theta_IV_delta)
 
     ## df of half-t priors
     ## 1 for half-Cauchy prior on global scale param: specifying a larger value
@@ -482,7 +493,7 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
 
     ## Check for sampling warnings
     sampler_params <- rstan::get_sampler_params(fit.mc, inc_warmup = FALSE)
-    divergent <- sum(sapply(sampler_params, function(x) sum(x[,"divergent__"])))
+    divergent <- sum(sapply(sampler_params, function(x) sum(x[, "divergent__"])))
     total_iterations <- sum(sapply(sampler_params, nrow))
 
     if (divergent > 0) {
@@ -516,17 +527,22 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
 #' @export
 run_mrhevo.fixedtau <- function(alpha_hat, se.alpha_hat, gamma_hat,
                                 se.gamma_hat, tau=1E-6, slab_scale=0.2,
-                                slab_df=2, priorsd_theta=1, model.dir) {
-    rstan_options(auto_write = TRUE)
+                                slab_df=2, priorsd_theta=1,
+                                model.dir=system.file("stan", package="mrhevo")) {
+    if (!requireNamespace("rstan", quietly=TRUE)) {
+        stop("The Stan backend requires the 'rstan' package. ",
+             "Run install_mrhevo_stan() to install it.")
+    }
+    rstan::rstan_options(auto_write=TRUE)
 
     ## check arguments for consistency
     stopifnot(length(alpha_hat)==length(gamma_hat))
 
     msg(bold, "Compiling stan model ... ")
-    mr.fixedtau.stanmodel <- stan_model(file=file.path(model.dir,
-                                                       "MRHevo_fixedtau.stan"),
-                                        model_name="MRHevo.fixedtau",
-                                        verbose=FALSE)
+    mr.fixedtau.stanmodel <- rstan::stan_model(
+        file=file.path(model.dir, "MRHevo_fixedtau.stan"),
+        model_name="MRHevo.fixedtau",
+        verbose=FALSE)
     msg(note, "Done.\n")
 
     J <- length(alpha_hat)
@@ -544,7 +560,7 @@ run_mrhevo.fixedtau <- function(alpha_hat, se.alpha_hat, gamma_hat,
                       nu_local=nu_local,
                       priorsd_theta=priorsd_theta,
                       slab_scale=slab_scale,
-                      slab_df=slab_df, priorsd_theta=priorsd_theta)
+                      slab_df=slab_df)
 
     msg(bold, "Sampling posterior distribution ... ")
     fit.mc <- rstan::sampling(object=mr.fixedtau.stanmodel,
@@ -639,16 +655,16 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
 #'
 #' @return A ggplot object showing pairs plot.
 #'
-#' @import bayesplot ggplot2 cowplot
+#' @import ggplot2 cowplot
 #' @export
 plot_posterior_pairs <- function(fit, pars = c("log_tau", "log_eta", "f")) {
     if (inherits(fit, "mrhevo_numpyro")) {
         # NumPyro output - extract directly from posterior list
         post <- fit$posterior
-        
+
         # Build data frame for requested parameters
         df_list <- list()
-        
+
         for (p in pars) {
             if (p %in% names(post)) {
                 vals <- post[[p]]
@@ -656,17 +672,17 @@ plot_posterior_pairs <- function(fit, pars = c("log_tau", "log_eta", "f")) {
                 df_list[[p]] <- as.vector(vals)
             }
         }
-        
+
         df_plot <- as.data.frame(df_list)
-        
+
         if (ncol(df_plot) < 2) {
             stop("Need at least 2 parameters for pairs plot")
         }
-        
+
         # Create pairs plot using cowplot grid
         plots_list <- list()
         n_pars <- ncol(df_plot)
-        
+
         for (i in 1:n_pars) {
             for (j in 1:n_pars) {
                 if (i == j) {
@@ -684,7 +700,7 @@ plot_posterior_pairs <- function(fit, pars = c("log_tau", "log_eta", "f")) {
                 } else {
                     # Upper triangle: correlation
                     cor_val <- cor(df_plot[, j], df_plot[, i], use = "complete.obs")
-                    p_ij <- ggplot() + 
+                    p_ij <- ggplot() +
                         annotate("text", x = 0.5, y = 0.5, label = sprintf("r = %.2f", cor_val), size = 5) +
                         theme_void() +
                         ggplot2::theme(text = ggplot2::element_text(size = 14))
@@ -692,24 +708,28 @@ plot_posterior_pairs <- function(fit, pars = c("log_tau", "log_eta", "f")) {
                 plots_list[[paste0(i, "_", j)]] <- p_ij
             }
         }
-        
+
         # Arrange in grid
-        p <- cowplot::plot_grid(plotlist = plots_list, 
+        p <- cowplot::plot_grid(plotlist = plots_list,
                                  nrow = n_pars, ncol = n_pars,
                                  labels = names(df_plot),
                                  label_size = 14)
-        
+
         return(p)
     } else {
         # Stan output - use bayesplot
+        if (!requireNamespace("bayesplot", quietly=TRUE)) {
+            stop("Plotting Stan fit objects requires the 'bayesplot' package. ",
+                 "Run install_mrhevo_stan() to install it.")
+        }
         np <- bayesplot::nuts_params(fit, type = "divergent")
-        
+
         p <- bayesplot::mcmc_pairs(fit, pars = pars,
                                    np = np,
                                    off_diag_args = list(alpha = 0.3))
-        
+
         p <- p + ggplot2::theme_bw() + ggplot2::theme(text = ggplot2::element_text(size = 18))
-        
+
         return(p)
     }
 }
@@ -729,6 +749,10 @@ plot_kappa_hist <- function(fit, bin_width = 0.02) {
         kappa <- fit$posterior$kappa
     } else {
         # Stan output
+        if (!requireNamespace("rstan", quietly=TRUE)) {
+            stop("Plotting Stan fit objects requires the 'rstan' package. ",
+                 "Run install_mrhevo_stan() to install it.")
+        }
         posterior <- rstan::extract(fit)
         kappa <- posterior$kappa
     }

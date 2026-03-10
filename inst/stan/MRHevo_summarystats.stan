@@ -1,0 +1,109 @@
+/* MRHevo_summarystats.stan */
+functions {
+  // elementwise inverse of a vector
+  vector inv_vec(vector x) {
+    vector[dims(x)[1]] res;
+    for (m in 1:dims(x)[1]) {
+      res[m] = 1 / x[m];
+    }
+    return res;
+  }
+}
+
+data {
+  int <lower=0> J; // number of instruments
+  real < lower=0 > scale_global; // scale for the half-t prior on tau
+  real < lower =1 > nu_global ; // degrees of freedom for the half-t prior on global scale param tau
+  real < lower =1 > nu_local ; // degrees of freedom for the half-t priors on local scale parameters
+  real < lower=0 > slab_scale; // slab scale for regularized horseshoe
+  real < lower=0 > slab_df; // slab degrees of freedom for regularized horseshoe
+  real < lower=0 > priorsd_theta; // sd of prior on theta
+  int <lower=0, upper=1> hierarchical_alpha; // use hierarchical prior on alpha (1) or not (0)
+  vector[J] gamma_hat; // estimated coeffs for regression of Y on Z
+  vector <lower=0> [J] sd_gamma_hat; // standard error of estimated coeffs gamma_hat
+  vector[J] alpha_hat; // estimated coeffs for effects of Z on X
+  vector <lower=0> [J] sd_alpha_hat; // standard error of estimated coeffs alpha_hat
+}
+
+parameters {
+  real < lower=0 > aux1_global;
+  real < lower=0 > aux2_global;
+  real < lower=0 > caux ;
+  vector[J] z; // pleiotropic effects, before global and local scaling
+  real theta; // causal effect of X on Y
+  // Non-hierarchical: alpha is sampled directly
+  vector[J] alpha; // effect of each instrument Z on X, distributed as N(alpha_hat, sd.alpha_hat)
+  // Hierarchical: alpha is drawn from a normal with learned parameters
+  real mu_alpha;
+  real <lower=0> sigma_alpha;
+  vector < lower=0 > [J] aux1_local;
+  vector < lower=0 > [J] aux2_local;
+}
+
+transformed parameters {
+  vector < lower =0 > [J] lambda ; // local shrinkage parameters
+  real<lower=0> tau;
+  vector <lower=0> [J] lambda_tilde;// 'truncated' local shrinkage parameters
+  real < lower =0 > c; // slab scale
+  vector[J] gamma; // effect of each instrument Z on Y, distributed as N(gamma_hat, sd_gamma_hat)
+  vector[J] beta; // pleiotropic effects after scaling
+  
+  // Determine alpha based on hierarchical option
+  vector[J] alpha_eff;
+  if (hierarchical_alpha == 1) {
+    alpha_eff = alpha;
+  } else {
+    alpha_eff = alpha;
+  }
+  
+  lambda   = aux1_local .* sqrt(aux2_local); // local scale parameters
+
+  //  standard t distribution: standard Gaussian scaled by inverse gamma with parameters 0.5 * \nu, 0.5 * \nu.  This is scaled again by scale_global
+  tau = aux1_global * sqrt(aux2_global) * scale_global;  // global scale parameter for pleiotropic effects
+  c = slab_scale * sqrt(caux); // manuscript uses s_slab for slab_scale, \eta for c
+  lambda_tilde = sqrt( c^2 * square(lambda) ./ (c^2 + tau^2 * square(lambda) ));
+  beta = z .* lambda_tilde * tau; // scaled vector of pleiotropic effects
+  gamma = beta + theta * alpha_eff;
+}
+
+model {
+  // Prior on hierarchical alpha parameters
+  if (hierarchical_alpha == 1) {
+    mu_alpha ~ normal(0, 1);
+    sigma_alpha ~ normal(0, 1);
+  }
+  
+  // Sample alpha based on hierarchical option
+  if (hierarchical_alpha == 1) {
+    // Hierarchical: alpha drawn from normal with learned parameters
+    alpha ~ normal(mu_alpha, sigma_alpha);
+  } else {
+    // Non-hierarchical: alpha fixed to alpha_hat (observed)
+    // In this case we treat alpha as data, not a parameter
+    alpha ~ normal(alpha_hat, sd_alpha_hat);
+  }
+  
+  alpha_hat ~ normal(alpha, sd_alpha_hat);
+  gamma_hat ~ normal(gamma, sd_gamma_hat);
+  // half Student-t priors for local and global scale parameters (nu = 1 corresponds to horseshoe)
+  theta ~ normal(0, priorsd_theta);
+  z ~ std_normal();
+
+  aux1_local ~ std_normal(); // aux1_local
+  aux2_local ~ inv_gamma(0.5 * nu_local, 0.5 * nu_local);
+  aux1_global ~ normal(0, 1);  // aux1_global
+  aux2_global ~ inv_gamma(0.5 * nu_global, 0.5 * nu_global);
+  // regularized horseshoe has an extra parameter caux
+  caux ~ inv_gamma(0.5 * slab_df , 0.5 * slab_df );
+}
+
+generated quantities {
+  vector<lower=0>[J] kappa; // unregularized shrinkage factor for each coefficient
+  real<lower=0> f; // effective fraction of nonzero coefficients
+  real log_c; // log of regularization parameter
+  real log_tau; // log of global scale parameter
+  kappa = inv_vec(1.0 + lambda_tilde .* lambda_tilde);
+  f = sum(1 - kappa) / J;
+  log_c = log(c);
+  log_tau = log(tau);
+}

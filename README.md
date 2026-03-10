@@ -22,11 +22,25 @@ The motivation for this work was to develop a method to test formally for causal
 
 ## Installation
 
-To install current version of the package from GitHub use:
+To install the current version of the package from GitHub use:
 
 ```r
 library(devtools)
 devtools::install_github(repo="molepi-precmed/mrhevo")
+```
+
+The NumPyro Python backend is installed automatically on first package load.
+If you need to rebuild it, call:
+
+```r
+library(mrhevo)
+install_mrhevo_python()
+```
+
+To use the Stan backend (optional, slower), install it separately:
+
+```r
+install_mrhevo_stan()
 ```
 
 If you want to run the examples: 
@@ -81,6 +95,7 @@ fit <- run_mrhevo.numpyro(
   se.gamma_hat = se.gamma_hat,
   fraction_pleio = 0.5,
   slab_scale = 0.2,
+  slab_df = 2,
   priorsd_theta = 1,
   model_path = model_path,
   num_warmup = 500,
@@ -108,7 +123,8 @@ print(p)
 As an alternative to NumPyro, you can use the Stan implementation. This is slower, but you may have to use Stan if you have old CPUs that do not support the instruction set required for the JAX library.  
 
 ```r
-library(rstan)
+## Install the Stan backend if not already done
+install_mrhevo_stan()
 
 # Path to Stan models (included in package)
 model.dir <- system.file("stan", package = "mrhevo")
@@ -121,6 +137,7 @@ fit_stan <- run_mrhevo.sstats(
   se.gamma_hat = se.gamma_hat,
   fraction_pleio = 0.5,
   slab_scale = 0.2,
+  slab_df = 2,
   priorsd_theta = 1,
   model.dir = model.dir,
   hierarchical_alpha = TRUE  # use hierarchical prior on alpha (default)

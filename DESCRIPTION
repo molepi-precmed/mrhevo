@@ -31,8 +31,6 @@ Imports:
     doParallel,
     crayon,
     data.table,
-    rstan,
-    bayesplot,
     cowplot,
     car,
     ggrepel,
@@ -40,8 +38,9 @@ Imports:
     ggplotify,
     reticulate
 Suggests:
+    rstan,
+    bayesplot,
     testthat (>= 3.0)
-LinkingTo: Rcpp, BH, bigmemory, RcppEigen
 ByteCompile: TRUE
 Encoding: UTF-8
 RoxygenNote: 7.3.2

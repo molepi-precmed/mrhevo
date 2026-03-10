@@ -193,6 +193,24 @@ def nullhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_
 
 
 def setup_sampler(model, dense_mass=False, target_accept_prob=0.95, num_warmup=500):
+    """Set up a NumPyro NUTS sampler.
+
+    Parameters
+    ----------
+    model : callable
+        NumPyro probabilistic model function.
+    dense_mass : bool, optional
+        Whether to use a dense mass matrix (default False).
+    target_accept_prob : float, optional
+        Target acceptance probability for the NUTS kernel (default 0.95).
+    num_warmup : int, optional
+        Number of warmup (burn-in) iterations (default 500).
+
+    Returns
+    -------
+    MCMC
+        Configured MCMC object ready to run.
+    """
     # https://num.pyro.ai/en/latest/mcmc.html
     nuts_kernel = NUTS(model, target_accept_prob=target_accept_prob, dense_mass=dense_mass)
     mcmc = MCMC(nuts_kernel, num_warmup=num_warmup, num_samples=1000, num_chains=4,
@@ -202,27 +220,103 @@ def setup_sampler(model, dense_mass=False, target_accept_prob=0.95, num_warmup=5
 
 
 def render_graph(mcmc, alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info, filename):
+    """Render the probabilistic graphical model to a file.
+
+    Parameters
+    ----------
+    mcmc : callable
+        NumPyro model function (e.g. mrhevo).
+    alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat : array-like
+        Summary statistics passed to the model.
+    slab_scale : float
+        Slab scale for the regularized horseshoe prior.
+    slab_df : float
+        Degrees of freedom for the slab component.
+    scale_global : float
+        Scale for the global shrinkage parameter tau.
+    priorsd_theta : float
+        Standard deviation of the prior on the causal effect theta.
+    info : float
+        Mean Fisher information for the IV estimates.
+    filename : str
+        Output filename for the rendered graph.
+    """
     mrhevograph = npyr.render_model(mcmc, model_args=(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info), render_distributions=True, filename=filename)
 
     
 def run_sampler(mcmc, alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info):
-    np.random.seed(42) 
+    """Run the NUTS sampler and return the MCMC object.
+
+    Parameters
+    ----------
+    mcmc : MCMC
+        Configured MCMC object (from setup_sampler).
+    alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat : array-like
+        Summary statistics passed as model arguments.
+    slab_scale : float
+        Slab scale for the regularized horseshoe prior.
+    slab_df : float
+        Degrees of freedom for the slab component.
+    scale_global : float
+        Scale for the global shrinkage parameter tau.
+    priorsd_theta : float
+        Standard deviation of the prior on the causal effect theta.
+    info : float
+        Mean Fisher information for the IV estimates.
+
+    Returns
+    -------
+    MCMC
+        MCMC object with posterior samples.
+    """
+    np.random.seed(42)
     rng_key = random.PRNGKey(42)
     rng_key, rng_key_ = random.split(rng_key)
     mcmc.run(rng_key, alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, info, extra_fields=('potential_energy',))
     return mcmc
 
 def get_idata(mcmc):
+    """Convert MCMC output to an ArviZ InferenceData object.
+
+    Parameters
+    ----------
+    mcmc : MCMC
+        Completed MCMC object.
+
+    Returns
+    -------
+    arviz.InferenceData
+        ArviZ inference data object with posterior samples and diagnostics.
+    """
     idata = az.from_numpyro(mcmc)
     return(idata)
 
 def get_diagnostics(idata):
-    samplestats = idata.sample_stats 
+    """Extract sampler diagnostics from an ArviZ InferenceData object.
+
+    Parameters
+    ----------
+    idata : arviz.InferenceData
+        ArviZ inference data object.
+
+    Returns
+    -------
+    list
+        List of (key, value) pairs from the sample statistics group.
+    """
+    samplestats = idata.sample_stats
     samplestats_keyvaluepairs = samplestats.items()
     samplestats_list = list(samplestats_keyvaluepairs)
     return samplestats_list
 
 def save_plots(idata):
+    """Save trace and pairs plots to PDF files in the current directory.
+
+    Parameters
+    ----------
+    idata : arviz.InferenceData
+        ArviZ inference data object with posterior samples.
+    """
     plt.rcParams['figure.constrained_layout.use'] = True
     az.plot_trace(idata, var_names=["theta", "tau", "eta", "f", "beta", "kappa"], compact=True)
     plt.savefig("mrhevo_traceplot.pdf")
@@ -231,7 +325,22 @@ def save_plots(idata):
     plt.savefig("mrhevo_pairsplot.pdf")
 
 def get_mcmc_samples(mcmc):
-    posterior_samples = mcmc.get_samples() 
+    """Extract a curated set of posterior samples from a completed MCMC run.
+
+    Returns samples for the parameters theta, tau, log_tau, eta, log_eta, f,
+    b, alpha, beta, kappa, and lambda_tilde.
+
+    Parameters
+    ----------
+    mcmc : MCMC
+        Completed MCMC object.
+
+    Returns
+    -------
+    list
+        List of (name, array) pairs for the requested parameters.
+    """
+    posterior_samples = mcmc.get_samples()
     posterior_samples = {key: posterior_samples[key] for key in posterior_samples.keys()
                          & {"theta", "tau", "log_tau", "eta", "log_eta", "f", "b", "alpha", "beta", "kappa", "lambda_tilde"}} 
     samples_keyvaluepairs = posterior_samples.items()
@@ -239,7 +348,21 @@ def get_mcmc_samples(mcmc):
     return samples_list
 
 def get_null_mcmc_samples(mcmc):
-    posterior_samples = mcmc.get_samples() 
+    """Extract posterior samples for the null model (theta fixed to zero).
+
+    Returns samples for tau, f, alpha, and lambda_tilde only.
+
+    Parameters
+    ----------
+    mcmc : MCMC
+        Completed MCMC object from the null model.
+
+    Returns
+    -------
+    list
+        List of (name, array) pairs for the requested parameters.
+    """
+    posterior_samples = mcmc.get_samples()
     posterior_samples = {key: posterior_samples[key] for key in posterior_samples.keys()
                          & {"tau", "f", "alpha", "lambda_tilde"}} 
     samples_keyvaluepairs = posterior_samples.items()
@@ -247,6 +370,12 @@ def get_null_mcmc_samples(mcmc):
     return samples_list
 
 def main():
+    """Run a complete MR-Hevo analysis from an R data file.
+
+    Reads model inputs from ``mrhevo_example.RData`` in the current directory,
+    fits the regularized horseshoe model with NumPyro, prints diagnostics, and
+    saves trace and pairs plots.
+    """
     data = pyr.read_rda('mrhevo_example.RData')
     alpha_hat = data["alpha_hat"]
     se_alpha_hat = data["se.alpha_hat"]
