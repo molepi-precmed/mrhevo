@@ -867,17 +867,13 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
     sample_names <- c("theta", "tau", "log_tau", "eta", "log_eta", "f", "b",
                       "alpha", "beta", "kappa", "lambda_tilde")
 
-    raw_samples <- nuts_kernel$get_samples()
-    raw_keys <- reticulate::py_to_r(reticulate::py_builtins$list(raw_samples$keys()))
+    ## Convert all samples at once; py_to_r turns the dict into a named R list.
+    all_samples <- reticulate::py_to_r(nuts_kernel$get_samples())
 
     posterior_list <- list()
     for (name in sample_names) {
-        if (name %in% raw_keys) {
-            tryCatch({
-                posterior_list[[name]] <- reticulate::py_to_r(raw_samples[[name]])
-            }, error = function(e) {
-                cat("Error extracting", name, ":", conditionMessage(e), "\n")
-            })
+        if (name %in% names(all_samples)) {
+            posterior_list[[name]] <- all_samples[[name]]
         }
     }
 
