@@ -196,6 +196,28 @@ def nullhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_
 # recompile the model on every invocation.
 _mcmc_cache = {}
 
+def get_samples_numpy(mcmc, sample_names):
+    """Extract named posterior samples as a dict of plain NumPy arrays.
+
+    Converts all requested parameters from JAX arrays to NumPy in one Python-
+    level pass, avoiding the overhead of multiple R→Python round-trips.
+
+    Parameters
+    ----------
+    mcmc : MCMC
+        Completed MCMC object.
+    sample_names : list of str
+        Parameter names to extract.
+
+    Returns
+    -------
+    dict
+        Mapping name → numpy.ndarray for each name found in get_samples().
+    """
+    samples = mcmc.get_samples()
+    return {name: np.asarray(samples[name]) for name in sample_names if name in samples}
+
+
 def get_cached_mcmc(target_accept_prob=0.95, num_warmup=500, num_samples=1000, num_chains=4):
     """Return a cached MCMC object for the mrhevo model.
 

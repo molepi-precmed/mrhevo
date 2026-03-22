@@ -823,7 +823,12 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
     np <- reticulate::import("numpy", as = "np")
     random <- reticulate::import("jax.random")
 
-    reticulate::source_python(model_path)
+    ## Source the Python module only once per session; subsequent calls reuse
+    ## the already-loaded module (and its _mcmc_cache).
+    if (!isTRUE(mrhevo.env$python_loaded)) {
+        reticulate::source_python(model_path)
+        mrhevo.env$python_loaded <- TRUE
+    }
 
     J <- length(alpha_hat)
     var.theta_IV_delta <- (se.gamma_hat / alpha_hat)^2 + gamma_hat^2 * se.alpha_hat^2 / alpha_hat^4
@@ -867,21 +872,11 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
     sample_names <- c("theta", "tau", "log_tau", "eta", "log_eta", "f", "b",
                       "alpha", "beta", "kappa", "lambda_tilde")
 
-    ## get_samples() returns JAX arrays; convert each to NumPy so reticulate
-    ## can coerce them to R arrays.
-    raw_samples <- nuts_kernel$get_samples()
-
-    posterior_list <- list()
-    for (name in sample_names) {
-        tryCatch({
-            arr <- raw_samples[[name]]
-            if (!is.null(arr)) {
-                posterior_list[[name]] <- reticulate::py_to_r(np$asarray(arr))
-            }
-        }, error = function(e) {
-            cat("Error extracting", name, ":", conditionMessage(e), "\n")
-        })
-    }
+    ## Convert all JAX arrays to NumPy in one Python call, then let reticulate
+    ## convert the dict of NumPy arrays to a named R list.
+    posterior_list <- reticulate::py_to_r(
+        get_samples_numpy(nuts_kernel, sample_names)
+    )
 
     fit_numpyro <- list(
         posterior = posterior_list,
