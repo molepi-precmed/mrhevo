@@ -867,14 +867,20 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
     sample_names <- c("theta", "tau", "log_tau", "eta", "log_eta", "f", "b",
                       "alpha", "beta", "kappa", "lambda_tilde")
 
-    ## Convert all samples at once; py_to_r turns the dict into a named R list.
-    all_samples <- reticulate::py_to_r(nuts_kernel$get_samples())
+    ## get_samples() returns JAX arrays; convert each to NumPy so reticulate
+    ## can coerce them to R arrays.
+    raw_samples <- nuts_kernel$get_samples()
 
     posterior_list <- list()
     for (name in sample_names) {
-        if (name %in% names(all_samples)) {
-            posterior_list[[name]] <- all_samples[[name]]
-        }
+        tryCatch({
+            arr <- raw_samples[[name]]
+            if (!is.null(arr)) {
+                posterior_list[[name]] <- reticulate::py_to_r(np$asarray(arr))
+            }
+        }, error = function(e) {
+            cat("Error extracting", name, ":", conditionMessage(e), "\n")
+        })
     }
 
     fit_numpyro <- list(
