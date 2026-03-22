@@ -825,9 +825,16 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
 
     ## Source the Python module only once per session; subsequent calls reuse
     ## the already-loaded module (and its _mcmc_cache).
+    ## source_python() only binds names in the calling frame, so we persist
+    ## the function references in mrhevo.env for retrieval on later calls.
     if (!isTRUE(mrhevo.env$python_loaded)) {
         reticulate::source_python(model_path)
+        mrhevo.env$get_cached_mcmc   <- get_cached_mcmc
+        mrhevo.env$get_samples_numpy <- get_samples_numpy
         mrhevo.env$python_loaded <- TRUE
+    } else {
+        get_cached_mcmc   <- mrhevo.env$get_cached_mcmc
+        get_samples_numpy <- mrhevo.env$get_samples_numpy
     }
 
     J <- length(alpha_hat)
