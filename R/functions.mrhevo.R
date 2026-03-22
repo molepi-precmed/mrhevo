@@ -821,10 +821,7 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
     msg(bold, "Setting up NumPyro...")
 
     np <- reticulate::import("numpy", as = "np")
-    jnp <- reticulate::import("jax.numpy", as = "jnp")
     random <- reticulate::import("jax.random")
-    numpyro <- reticulate::import("numpyro")
-    numpyro_distributions <- reticulate::import("numpyro.distributions")
 
     reticulate::source_python(model_path)
 
@@ -841,25 +838,12 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
 
     msg(bold, "Running NumPyro MCMC...")
 
-    model <- mrhevo(
-        alpha_hat = np$array(alpha_hat),
-        se_alpha_hat = np$array(se.alpha_hat),
-        gamma_hat = np$array(gamma_hat),
-        se_gamma_hat = np$array(se.gamma_hat),
-        slab_scale = slab_scale,
-        slab_df = slab_df,
-        scale_global = scale_global,
-        priorsd_theta = priorsd_theta,
-        hierarchical_alpha = as.integer(hierarchical_alpha)
-    )
-
-    nuts_kernel <- numpyro$infer$MCMC(
-        numpyro$infer$NUTS(model, target_accept_prob = target_accept_prob),
+    ## Reuse a cached MCMC object so JAX skips recompilation on subsequent calls.
+    nuts_kernel <- get_cached_mcmc(
+        target_accept_prob = target_accept_prob,
         num_warmup = as.integer(num_warmup),
         num_samples = as.integer(num_samples),
-        num_chains = as.integer(num_chains),
-        chain_method = "parallel",
-        progress_bar = TRUE
+        num_chains = as.integer(num_chains)
     )
 
     start_time <- Sys.time()
@@ -878,34 +862,23 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
 
     msg(note, paste0("NumPyro sampling completed in ", round(elapsed, 1), " seconds\n"))
 
-    samples <- nuts_kernel$get_samples()
-
+    ## Extract samples directly from get_samples() — avoids the expensive
+    ## az$from_numpyro() ArviZ conversion which dominated run time.
     sample_names <- c("theta", "tau", "log_tau", "eta", "log_eta", "f", "b",
                       "alpha", "beta", "kappa", "lambda_tilde")
 
-    np <- reticulate::import("numpy", as = "np")
-    az <- reticulate::import("arviz")
-
-    idata <- az$from_numpyro(nuts_kernel)
+    raw_samples <- nuts_kernel$get_samples()
+    raw_keys <- reticulate::py_to_r(reticulate::py_builtins$list(raw_samples$keys()))
 
     posterior_list <- list()
     for (name in sample_names) {
-        tryCatch({
-            if (name %in% names(idata$posterior)) {
-                arr <- np$asarray(idata$posterior[[name]])
-                arr <- reticulate::py_to_r(arr)
-                if (!is.null(dim(arr))) {
-                    if (length(dim(arr)) == 2) {
-                        arr <- as.vector(arr)
-                    }
-                } else {
-                    arr <- as.vector(arr)
-                }
-                posterior_list[[name]] <- arr
-            }
-        }, error = function(e) {
-            cat("Error extracting", name, ":", conditionMessage(e), "\n")
-        })
+        if (name %in% raw_keys) {
+            tryCatch({
+                posterior_list[[name]] <- reticulate::py_to_r(raw_samples[[name]])
+            }, error = function(e) {
+                cat("Error extracting", name, ":", conditionMessage(e), "\n")
+            })
+        }
     }
 
     fit_numpyro <- list(

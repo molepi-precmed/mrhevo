@@ -192,6 +192,47 @@ def nullhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_
     return nullhevo
 
 
+# Module-level cache: reuse compiled MCMC objects across calls so JAX does not
+# recompile the model on every invocation.
+_mcmc_cache = {}
+
+def get_cached_mcmc(target_accept_prob=0.95, num_warmup=500, num_samples=1000, num_chains=4):
+    """Return a cached MCMC object for the mrhevo model.
+
+    On the first call with a given set of sampler hyperparameters the MCMC
+    object is created and JAX compiles the model.  Subsequent calls with the
+    same hyperparameters return the existing object, skipping recompilation.
+
+    Parameters
+    ----------
+    target_accept_prob : float
+        Target acceptance probability for NUTS (default 0.95).
+    num_warmup : int
+        Number of warmup steps (default 500).
+    num_samples : int
+        Number of posterior samples per chain (default 1000).
+    num_chains : int
+        Number of parallel chains (default 4).
+
+    Returns
+    -------
+    MCMC
+        Configured (and possibly already compiled) MCMC object.
+    """
+    key = (target_accept_prob, num_warmup, num_samples, num_chains)
+    if key not in _mcmc_cache:
+        nuts = NUTS(mrhevo, target_accept_prob=target_accept_prob)
+        _mcmc_cache[key] = MCMC(
+            nuts,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            chain_method="parallel",
+            progress_bar=True,
+        )
+    return _mcmc_cache[key]
+
+
 def setup_sampler(model, dense_mass=False, target_accept_prob=0.95, num_warmup=500):
     """Set up a NumPyro NUTS sampler.
 
