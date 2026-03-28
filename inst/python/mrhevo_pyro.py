@@ -150,6 +150,55 @@ def mrhevoforgraph(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale,
     return mrhevoforgraph
 
 
+def mrhevo_gaussian(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat,
+                    slab_scale, priorsd_theta, hierarchical_alpha=1):
+    """MR model with Gaussian (non-sparse) prior on direct pleiotropic effects.
+
+    Replaces the regularized horseshoe with a simple Normal(0, slab_scale)
+    prior on per-instrument direct effects. Suitable when pleiotropy is
+    expected to be diffuse rather than sparse.
+
+    Parameters
+    ----------
+    alpha_hat : array, shape (J,)
+        Observed instrument-exposure summary statistics.
+    se_alpha_hat : array, shape (J,)
+        Standard errors for alpha_hat.
+    gamma_hat : array, shape (J,)
+        Observed instrument-outcome summary statistics.
+    se_gamma_hat : array, shape (J,)
+        Standard errors for gamma_hat.
+    slab_scale : float
+        Scale (standard deviation) of the Gaussian prior on direct effects.
+    priorsd_theta : float
+        Standard deviation of the Normal(0, priorsd_theta) prior on theta.
+    hierarchical_alpha : int
+        1 = hierarchical prior on alpha (default); 0 = non-hierarchical.
+    """
+    J = alpha_hat.shape[0]
+
+    θ = npyr.sample("theta", dist.Normal(0, priorsd_theta))
+
+    if hierarchical_alpha == 1:
+        mu_alpha = npyr.sample("mu_alpha", dist.Normal(0, 1.0))
+        sigma_alpha = npyr.sample("sigma_alpha", dist.HalfNormal(1.0))
+
+    with npyr.plate("J instruments", J):
+        if hierarchical_alpha == 1:
+            alpha = npyr.sample("alpha", dist.Normal(mu_alpha, sigma_alpha))
+        else:
+            alpha = npyr.sample("alpha", dist.Normal(0, 1.0))
+
+        direct = npyr.sample("direct", dist.Normal(0, slab_scale))
+        gamma = npyr.deterministic("gamma", θ * alpha + direct)
+        beta = npyr.deterministic("beta", direct)
+
+        npyr.sample("alpha_hat", dist.Normal(alpha, se_alpha_hat), obs=alpha_hat)
+        npyr.sample("gamma_hat", dist.Normal(gamma, se_gamma_hat), obs=gamma_hat)
+
+    return mrhevo_gaussian
+
+
 def nullhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, hierarchical_alpha=1):
     """Null model (no causal effect, theta = 0)"""
     rng_key = random.PRNGKey(42)
@@ -192,9 +241,10 @@ def nullhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_
     return nullhevo
 
 
-# Module-level cache: reuse compiled MCMC objects across calls so JAX does not
+# Module-level caches: reuse compiled MCMC objects across calls so JAX does not
 # recompile the model on every invocation.
 _mcmc_cache = {}
+_mcmc_cache_gaussian = {}
 
 def get_samples_numpy(mcmc, sample_names):
     """Extract named posterior samples as a dict of plain NumPy arrays.
@@ -253,6 +303,43 @@ def get_cached_mcmc(target_accept_prob=0.95, num_warmup=500, num_samples=1000, n
             progress_bar=True,
         )
     return _mcmc_cache[key]
+
+
+def get_cached_mcmc_gaussian(target_accept_prob=0.95, num_warmup=500, num_samples=1000, num_chains=4):
+    """Return a cached MCMC object for the mrhevo_gaussian model.
+
+    Analogous to get_cached_mcmc but uses the Gaussian-prior model.  The first
+    call compiles the model via JAX; subsequent calls with identical
+    hyperparameters skip recompilation.
+
+    Parameters
+    ----------
+    target_accept_prob : float
+        Target acceptance probability for NUTS (default 0.95).
+    num_warmup : int
+        Number of warmup steps (default 500).
+    num_samples : int
+        Number of posterior samples per chain (default 1000).
+    num_chains : int
+        Number of parallel chains (default 4).
+
+    Returns
+    -------
+    MCMC
+        Configured (and possibly already compiled) MCMC object.
+    """
+    key = (target_accept_prob, num_warmup, num_samples, num_chains)
+    if key not in _mcmc_cache_gaussian:
+        nuts = NUTS(mrhevo_gaussian, target_accept_prob=target_accept_prob)
+        _mcmc_cache_gaussian[key] = MCMC(
+            nuts,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            chain_method="parallel",
+            progress_bar=True,
+        )
+    return _mcmc_cache_gaussian[key]
 
 
 def setup_sampler(model, dense_mass=False, target_accept_prob=0.95, num_warmup=500):

@@ -803,7 +803,8 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                                 env_path = NULL,
                                 hierarchical_alpha = TRUE,
                                 num_warmup = 500, num_samples = 1000,
-                                num_chains = 4, target_accept_prob = 0.95) {
+                                num_chains = 4, target_accept_prob = 0.95,
+                                prior = "horseshoe") {
 
     if (is.null(env_path)) {
         env_path <- "~/.virtualenvs/mrhevo"
@@ -823,62 +824,89 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
     np <- reticulate::import("numpy", as = "np")
     random <- reticulate::import("jax.random")
 
+    prior <- match.arg(prior, c("horseshoe", "gaussian"))
+
     ## Source the Python module only once per session; subsequent calls reuse
     ## the already-loaded module (and its _mcmc_cache).
     ## source_python() only binds names in the calling frame, so we persist
     ## the function references in mrhevo.env for retrieval on later calls.
     if (!isTRUE(mrhevo.env$python_loaded)) {
         reticulate::source_python(model_path)
-        mrhevo.env$get_cached_mcmc   <- get_cached_mcmc
-        mrhevo.env$get_samples_numpy <- get_samples_numpy
+        mrhevo.env$get_cached_mcmc          <- get_cached_mcmc
+        mrhevo.env$get_cached_mcmc_gaussian <- get_cached_mcmc_gaussian
+        mrhevo.env$get_samples_numpy        <- get_samples_numpy
         mrhevo.env$python_loaded <- TRUE
     } else {
-        get_cached_mcmc   <- mrhevo.env$get_cached_mcmc
-        get_samples_numpy <- mrhevo.env$get_samples_numpy
+        get_cached_mcmc          <- mrhevo.env$get_cached_mcmc
+        get_cached_mcmc_gaussian <- mrhevo.env$get_cached_mcmc_gaussian
+        get_samples_numpy        <- mrhevo.env$get_samples_numpy
     }
 
     J <- length(alpha_hat)
     var.theta_IV_delta <- (se.gamma_hat / alpha_hat)^2 + gamma_hat^2 * se.alpha_hat^2 / alpha_hat^4
     info <- mean(1 / var.theta_IV_delta)
 
-    nu_global <- 1
-    nu_local <- 1
-    r_pleio <- fraction_pleio * J
-    tau0 <- (r_pleio / (J - r_pleio)) / sqrt(info)
-    priormedian <- qt(p = 0.75, df = nu_global, lower.tail = TRUE)
-    scale_global <- tau0 / priormedian
-
     msg(bold, "Running NumPyro MCMC...")
-
-    ## Reuse a cached MCMC object so JAX skips recompilation on subsequent calls.
-    nuts_kernel <- get_cached_mcmc(
-        target_accept_prob = target_accept_prob,
-        num_warmup = as.integer(num_warmup),
-        num_samples = as.integer(num_samples),
-        num_chains = as.integer(num_chains)
-    )
 
     start_time <- Sys.time()
     rng_key <- random$PRNGKey(42L)
-    nuts_kernel$run(rng_key,
-                    alpha_hat = np$array(alpha_hat),
-                    se_alpha_hat = np$array(se.alpha_hat),
-                    gamma_hat = np$array(gamma_hat),
-                    se_gamma_hat = np$array(se.gamma_hat),
-                    slab_scale = as.double(slab_scale),
-                    slab_df = as.double(slab_df),
-                    scale_global = as.double(scale_global),
-                    priorsd_theta = as.double(priorsd_theta),
-                    hierarchical_alpha = as.integer(hierarchical_alpha))
+
+    if (prior == "horseshoe") {
+        nu_global <- 1
+        r_pleio <- fraction_pleio * J
+        tau0 <- (r_pleio / (J - r_pleio)) / sqrt(info)
+        priormedian <- qt(p = 0.75, df = nu_global, lower.tail = TRUE)
+        scale_global <- tau0 / priormedian
+
+        ## Reuse a cached MCMC object so JAX skips recompilation on subsequent calls.
+        nuts_kernel <- get_cached_mcmc(
+            target_accept_prob = target_accept_prob,
+            num_warmup = as.integer(num_warmup),
+            num_samples = as.integer(num_samples),
+            num_chains = as.integer(num_chains)
+        )
+
+        nuts_kernel$run(rng_key,
+                        alpha_hat = np$array(alpha_hat),
+                        se_alpha_hat = np$array(se.alpha_hat),
+                        gamma_hat = np$array(gamma_hat),
+                        se_gamma_hat = np$array(se.gamma_hat),
+                        slab_scale = as.double(slab_scale),
+                        slab_df = as.double(slab_df),
+                        scale_global = as.double(scale_global),
+                        priorsd_theta = as.double(priorsd_theta),
+                        hierarchical_alpha = as.integer(hierarchical_alpha))
+
+        sample_names <- c("theta", "tau", "log_tau", "eta", "log_eta", "f", "b",
+                          "alpha", "beta", "kappa", "lambda_tilde")
+
+    } else {  ## gaussian
+
+        nuts_kernel <- get_cached_mcmc_gaussian(
+            target_accept_prob = target_accept_prob,
+            num_warmup = as.integer(num_warmup),
+            num_samples = as.integer(num_samples),
+            num_chains = as.integer(num_chains)
+        )
+
+        nuts_kernel$run(rng_key,
+                        alpha_hat = np$array(alpha_hat),
+                        se_alpha_hat = np$array(se.alpha_hat),
+                        gamma_hat = np$array(gamma_hat),
+                        se_gamma_hat = np$array(se.gamma_hat),
+                        slab_scale = as.double(slab_scale),
+                        priorsd_theta = as.double(priorsd_theta),
+                        hierarchical_alpha = as.integer(hierarchical_alpha))
+
+        sample_names <- c("theta", "alpha", "beta", "direct", "mu_alpha", "sigma_alpha")
+    }
+
     elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
     msg(note, paste0("NumPyro sampling completed in ", round(elapsed, 1), " seconds\n"))
 
     ## Extract samples directly from get_samples() — avoids the expensive
     ## az$from_numpyro() ArviZ conversion which dominated run time.
-    sample_names <- c("theta", "tau", "log_tau", "eta", "log_eta", "f", "b",
-                      "alpha", "beta", "kappa", "lambda_tilde")
-
     ## Convert all JAX arrays to NumPy in one Python call, then let reticulate
     ## convert the dict of NumPy arrays to a named R list.
     posterior_list <- reticulate::py_to_r(
@@ -887,6 +915,7 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
 
     fit_numpyro <- list(
         posterior = posterior_list,
+        prior = prior,
         elapsed = elapsed,
         num_chains = num_chains,
         num_samples = num_samples,
