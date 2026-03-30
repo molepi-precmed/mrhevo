@@ -151,12 +151,13 @@ def mrhevoforgraph(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale,
 
 
 def mrhevo_gaussian(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat,
-                    slab_scale, priorsd_theta, hierarchical_alpha=1):
+                    slab_scale, slab_df, priorsd_theta, hierarchical_alpha=1):
     """MR model with Gaussian (non-sparse) prior on direct pleiotropic effects.
 
-    Replaces the regularized horseshoe with a simple Normal(0, slab_scale)
-    prior on per-instrument direct effects. Suitable when pleiotropy is
-    expected to be diffuse rather than sparse.
+    The scale of the Gaussian prior on direct effects is learned from the data
+    via a half-StudentT(df=slab_df, scale=slab_scale) prior on sigma,
+    parameterised as an InverseGamma auxiliary (the same pattern used for eta
+    in the regularized horseshoe model).
 
     Parameters
     ----------
@@ -169,7 +170,9 @@ def mrhevo_gaussian(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat,
     se_gamma_hat : array, shape (J,)
         Standard errors for gamma_hat.
     slab_scale : float
-        Scale (standard deviation) of the Gaussian prior on direct effects.
+        Scale of the half-StudentT prior on the direct-effect SD sigma.
+    slab_df : float
+        Degrees of freedom of the half-StudentT prior on sigma.
     priorsd_theta : float
         Standard deviation of the Normal(0, priorsd_theta) prior on theta.
     hierarchical_alpha : int
@@ -178,6 +181,11 @@ def mrhevo_gaussian(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat,
     J = alpha_hat.shape[0]
 
     θ = npyr.sample("theta", dist.Normal(0, priorsd_theta))
+
+    # Learn scale of direct effects from data via half-StudentT prior,
+    # parameterised as InverseGamma auxiliary (same pattern as eta in mrhevo)
+    caux = npyr.sample("caux", dist.InverseGamma(0.5 * slab_df, 0.5 * slab_df))
+    sigma = npyr.deterministic("sigma", slab_scale * jnp.sqrt(caux))
 
     if hierarchical_alpha == 1:
         mu_alpha = npyr.sample("mu_alpha", dist.Normal(0, 1.0))
@@ -189,7 +197,7 @@ def mrhevo_gaussian(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat,
         else:
             alpha = npyr.sample("alpha", dist.Normal(0, 1.0))
 
-        direct = npyr.sample("direct", dist.Normal(0, slab_scale))
+        direct = npyr.sample("direct", dist.Normal(0, sigma))
         gamma = npyr.deterministic("gamma", θ * alpha + direct)
         beta = npyr.deterministic("beta", direct)
 

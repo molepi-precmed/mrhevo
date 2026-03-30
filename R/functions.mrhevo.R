@@ -895,10 +895,11 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                         gamma_hat = np$array(gamma_hat),
                         se_gamma_hat = np$array(se.gamma_hat),
                         slab_scale = as.double(slab_scale),
+                        slab_df = as.double(slab_df),
                         priorsd_theta = as.double(priorsd_theta),
                         hierarchical_alpha = as.integer(hierarchical_alpha))
 
-        sample_names <- c("theta", "alpha", "beta", "direct", "mu_alpha", "sigma_alpha")
+        sample_names <- c("theta", "sigma", "alpha", "beta", "direct", "mu_alpha", "sigma_alpha")
     }
 
     elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
