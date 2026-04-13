@@ -1,3 +1,11 @@
+In mrhevo_pyro.py (line 16), npyr.set_host_device_count(4) is called after import jax.numpy
+   as jnp (line 9). JAX initializes on first import, so set_host_device_count is a no-op — JAX has already  
+  locked in 1 device. The chains run sequentially despite chain_method="parallel".                          
+                                                                                                            
+  This needs to be fixed in the installed package file — The   
+  fix is to move set_host_device_count(4) before the JAX imports:   
+
+
 # MR-Hevo -- Inference of causal effects by Mendelian randomization, marginalizing over distribution of pleiotropic effects
 
 Mendelian randomization has been widely used to study causal effects of exposures (broadly defined to include behavioural traits, biomarkers and gene expression levels) on diseases.  The biggest methodological challenge is how to infer causality when some of the genetic instruments have direct (pleiotropic) effects on the outcome that are not mediated through the exposure under study.  These pleiotropic effects are not directly observed, and their distribution over the instruments is unknown.
