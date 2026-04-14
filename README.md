@@ -1,9 +1,5 @@
-In mrhevo_pyro.py (line 16), npyr.set_host_device_count(4) is called after import jax.numpy
-   as jnp (line 9). JAX initializes on first import, so set_host_device_count is a no-op — JAX has already  
-  locked in 1 device. The chains run sequentially despite chain_method="parallel".                          
-                                                                                                            
-  This needs to be fixed in the installed package file — The   
-  fix is to move set_host_device_count(4) before the JAX imports:   
+**Note:** `npyr.set_host_device_count(4)` is now called before any JAX imports in `mrhevo_pyro.py`. JAX locks in the device count on first import, so the call must precede all `jax` imports to take effect and allow MCMC chains to run in parallel with `chain_method="parallel"`.
+
 
 
 # MR-Hevo -- Inference of causal effects by Mendelian randomization, marginalizing over distribution of pleiotropic effects
