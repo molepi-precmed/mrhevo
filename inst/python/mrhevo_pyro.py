@@ -5,15 +5,16 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]="0.20"
 
+import numpyro as npyr
+npyr.set_host_device_count(4)
+
 import numpy as np
 import jax.numpy as jnp
 from jax import random
 
-import numpyro as npyr
 import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS
 #npyr.set_platform("cpu")
-npyr.set_host_device_count(4)
 npyr.enable_x64()
 
 import arviz as az
