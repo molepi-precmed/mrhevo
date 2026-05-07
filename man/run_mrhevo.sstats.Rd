@@ -14,7 +14,8 @@ run_mrhevo.sstats(
   slab_scale = 0.2,
   slab_df = 2,
   priorsd_theta = 1,
-  model.dir
+  model.dir = system.file("stan", package = "mrhevo"),
+  hierarchical_alpha = TRUE
 )
 }
 \arguments{
@@ -29,13 +30,21 @@ on outcome.}
 \item{se.gamma_hat}{Vector of standard errors for coefficients gamma_hat.}
 
 \item{fraction_pleio}{Prior guess at fraction of instruments that have
-pleiotropic effects: values between 0.05 and 0.95 are allowed.}
+pleiotropic effects: values between 0.01 and 0.99 are allowed.}
 
-\item{slab_scale}{scale param of prior on direct effects.}
+\item{slab_scale}{Scale parameter for slab component of regularized horseshoe
+prior (default 0.2).}
+
+\item{slab_df}{Degrees of freedom for slab component of regularized horseshoe
+prior (default 2).}
 
 \item{priorsd_theta}{Standard deviation of prior on theta.}
 
-\item{model.dir}{Full path to STAN model directory.}
+\item{model.dir}{Full path to STAN model directory
+(default: bundled Stan models).}
+
+\item{hierarchical_alpha}{Logical. If \code{TRUE} (default), uses a
+hierarchical model for alpha.}
 }
 \value{
 An object of class stanfit.

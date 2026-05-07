@@ -12,10 +12,13 @@ tests
 .Rdata$
 .Rhistory
 .git
-.stan
+\.stan$
 .RDS
 .gitignore
+.lintr
 .Rmd
 .md
 .pdf
 .html
+^LICENSE$
+^AGENTS\.md$

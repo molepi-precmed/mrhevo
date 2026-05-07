@@ -9,7 +9,7 @@ Authors@R: c(person("Paul", "McKeigue",
                     email="paul.mckeigue@ed.ac.uk", role=c("aut", "cre"),
                     comment=c(ORCID="0000-0002-5217-1034")),
              person("Andrii", "Iakovliev",
-                    email="andrii.iakovliev@ed.ac.uk", role=c("aut", "cre"),
+                    email="andrii.iakovliev@ed.ac.uk", role="aut",
                     comment=c(ORCID="0000-0003-4031-0073")),
              person("Buddhi", "Erabadda",
                     email="b.erabadda@ed.ac.uk", role="aut",
@@ -35,7 +35,6 @@ Imports:
     car,
     ggrepel,
     ggplot2,
-    ggplotify,
     reticulate
 Suggests:
     rstan,
@@ -43,5 +42,5 @@ Suggests:
     testthat (>= 3.0)
 ByteCompile: TRUE
 Encoding: UTF-8
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Config/testthat/edition: 3

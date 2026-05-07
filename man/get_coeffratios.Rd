@@ -8,6 +8,9 @@ get_coeffratios(coeffs.dt, use.delta = FALSE)
 }
 \arguments{
 \item{coeffs.dt}{Data table with coefficients for each genetic instrument.}
+
+\item{use.delta}{Logical. If \code{TRUE}, uses second-order delta method for
+standard errors of ratio estimates (default \code{FALSE}).}
 }
 \value{
 A data.table with coefficients for genetic instruments plus a column

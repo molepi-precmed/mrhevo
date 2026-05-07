@@ -7,7 +7,7 @@
 #' @param LF Whether a newline character should be added at the end of the
 #'        message (\code{TRUE} by default).
 #'
-#' @import crayon
+#' @importFrom crayon reset green yellow bold
 #' @export
 msg <- function(mode, ..., LF=TRUE) {
     message(mode(...), appendLF=LF)
@@ -29,6 +29,8 @@ header <- function(message) {
 #' Return upper bound on p-value where z is so extreme that pnorm(-z) returns 0.
 #'
 #' @param z Standard normal deviate.
+#' @param upper Logical. If \code{TRUE} (default), returns upper bound; if
+#'        \code{FALSE}, returns lower bound.
 #'
 #' @return A string in scientific notation.
 pnorm.extreme <- function(z, upper=TRUE) {
@@ -133,6 +135,8 @@ get_summarystatsforMR <- function(Y, Z, X_u) {
 #' Calculate ratios of coefficients.
 #'
 #' @param coeffs.dt Data table with coefficients for each genetic instrument.
+#' @param use.delta Logical. If \code{TRUE}, uses second-order delta method for
+#'        standard errors of ratio estimates (default \code{FALSE}).
 #'
 #' @return A data.table with coefficients for genetic instruments plus a column
 #'         containing ratios of coefficients for each genetic instrument.
@@ -268,10 +272,10 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
 #' Run Stan model for Mendelian randomization with regularized horsehoe prior
 #' on pleiotropic effects.
 #'
-#' @param sampling Logical. If set to \code{TRUE}, uses sampling rather than
-#'                 variational approximation.
-#' @param logistic Logical. If set to \code{TRUE}, uses logistic rather than
-#'                 linear regression.
+#' @param use.sampling Logical. If set to \code{TRUE} (default), uses sampling
+#'                     rather than variational approximation.
+#' @param logistic Logical. If set to \code{TRUE} (default), uses logistic
+#'                 rather than linear regression.
 #' @param Z Data.table of genetic instruments.
 #' @param Y Vector of outcomes.
 #' @param sigma_y Standard deviation of outcome variable. Used only if
@@ -282,8 +286,13 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
 #' @param se.alpha_hat Vector of standard errors for coefficients alpha_hat.
 #' @param fraction_pleio Prior guess at fraction of instruments that have
 #'        pleiotropic effects: values between 0.05 and 0.95 are allowed.
+#' @param slab_scale Scale parameter for slab component of regularized horseshoe
+#'        prior (default 0.25).
 #' @param priorsd_theta Standard deviation of prior on theta.
-#' @param model.dir Full path to STAN model directory.
+#' @param vb.algo Variational Bayes algorithm, one of \code{"meanfield"} or
+#'        \code{"fullrank"} (default \code{"meanfield"}).
+#' @param model.dir Full path to STAN model directory
+#'        (default: bundled Stan models).
 #'
 #' @returns An object of class stanfit.
 #'
@@ -411,10 +420,16 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
 #'        on outcome.
 #' @param se.gamma_hat Vector of standard errors for coefficients gamma_hat.
 #' @param fraction_pleio Prior guess at fraction of instruments that have
-#'        pleiotropic effects: values between 0.05 and 0.95 are allowed.
-#' @param slab_scale scale param of prior on direct effects.
+#'        pleiotropic effects: values between 0.01 and 0.99 are allowed.
+#' @param slab_scale Scale parameter for slab component of regularized horseshoe
+#'        prior (default 0.2).
+#' @param slab_df Degrees of freedom for slab component of regularized horseshoe
+#'        prior (default 2).
 #' @param priorsd_theta Standard deviation of prior on theta.
-#' @param model.dir Full path to STAN model directory.
+#' @param model.dir Full path to STAN model directory
+#'        (default: bundled Stan models).
+#' @param hierarchical_alpha Logical. If \code{TRUE} (default), uses a
+#'        hierarchical model for alpha.
 #'
 #' @return An object of class stanfit.
 #' @export
@@ -517,11 +532,14 @@ run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
 #' @param gamma_hat Vector of estimated coefficients for effect of instruments
 #'        on outcome.
 #' @param se.gamma_hat Vector of standard errors for coefficients gamma_hat.
-#' @param fraction_pleio Prior guess at fraction of instruments that have
-#'        pleiotropic effects: values between 0.05 and 0.95 are allowed.
-#' @param slab_scale scale param of prior on direct effects.
+#' @param tau Fixed value for global shrinkage parameter (default 1e-6).
+#' @param slab_scale Scale parameter for slab component of regularized horseshoe
+#'        prior (default 0.2).
+#' @param slab_df Degrees of freedom for slab component of regularized horseshoe
+#'        prior (default 2).
 #' @param priorsd_theta Standard deviation of prior on theta.
-#' @param model.dir Full path to STAN model directory.
+#' @param model.dir Full path to STAN model directory
+#'        (default: bundled Stan models).
 #'
 #' @return An object of class stanfit.
 #' @export
@@ -580,8 +598,8 @@ run_mrhevo.fixedtau <- function(alpha_hat, se.alpha_hat, gamma_hat,
 #'
 #' @param fraction_pleio Prior guess at fraction of effects that are nonzero.
 #' @param nu_global Shape parameter of gamma prior.
-#' @param J number of variables.
-#' @param pseudovariance Variance of outcome variable.
+#' @param J Number of variables.
+#' @param info Mean Fisher information for IV estimates.
 #'
 #' @return Value of tau0.
 set.tau0 <- function(fraction_pleio=NULL, nu_global=1, J, info) {
@@ -612,7 +630,8 @@ set.tau0 <- function(fraction_pleio=NULL, nu_global=1, J, info) {
 #'
 #' @return A ggplot object showing IV estimates with MLE as line through origin.
 #'
-#' @import ggplot2 data.table ggrepel
+#' @import ggplot2 data.table
+#' @importFrom ggrepel geom_text_repel
 #' @export
 plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta, qtlname = NULL) {
     theta_IV <- gamma_hat / alpha_hat
@@ -788,10 +807,14 @@ plot_kappa_hist <- function(fit, bin_width = 0.02) {
 #' @param priorsd_theta Standard deviation of prior on theta.
 #' @param model_path Path to the mrhevo_pyro.py script.
 #' @param env_path Path to Python virtual environment (default: ~/.virtualenvs/mrhevo).
+#' @param hierarchical_alpha Logical. If \code{TRUE} (default), uses a
+#'        hierarchical model for alpha.
 #' @param num_warmup Number of warmup iterations (default 500).
 #' @param num_samples Number of samples (default 1000).
 #' @param num_chains Number of chains (default 4).
 #' @param target_accept_prob Target acceptance probability (default 0.95).
+#' @param prior Prior distribution type, one of \code{"horseshoe"} (default)
+#'        or \code{"gaussian"}.
 #'
 #' @return A list with posterior samples in rstan-like format.
 #'

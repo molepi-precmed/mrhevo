@@ -12,9 +12,9 @@ set.tau0(fraction_pleio = NULL, nu_global = 1, J, info)
 
 \item{nu_global}{Shape parameter of gamma prior.}
 
-\item{J}{number of variables.}
+\item{J}{Number of variables.}
 
-\item{pseudovariance}{Variance of outcome variable.}
+\item{info}{Mean Fisher information for IV estimates.}
 }
 \value{
 Value of tau0.

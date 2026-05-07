@@ -14,7 +14,7 @@ run_mrhevo.fixedtau(
   slab_scale = 0.2,
   slab_df = 2,
   priorsd_theta = 1,
-  model.dir
+  model.dir = system.file("stan", package = "mrhevo")
 )
 }
 \arguments{
@@ -28,14 +28,18 @@ on outcome.}
 
 \item{se.gamma_hat}{Vector of standard errors for coefficients gamma_hat.}
 
-\item{slab_scale}{scale param of prior on direct effects.}
+\item{tau}{Fixed value for global shrinkage parameter (default 1e-6).}
+
+\item{slab_scale}{Scale parameter for slab component of regularized horseshoe
+prior (default 0.2).}
+
+\item{slab_df}{Degrees of freedom for slab component of regularized horseshoe
+prior (default 2).}
 
 \item{priorsd_theta}{Standard deviation of prior on theta.}
 
-\item{model.dir}{Full path to STAN model directory.}
-
-\item{fraction_pleio}{Prior guess at fraction of instruments that have
-pleiotropic effects: values between 0.05 and 0.95 are allowed.}
+\item{model.dir}{Full path to STAN model directory
+(default: bundled Stan models).}
 }
 \value{
 An object of class stanfit.

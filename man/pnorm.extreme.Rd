@@ -8,6 +8,9 @@ pnorm.extreme(z, upper = TRUE)
 }
 \arguments{
 \item{z}{Standard normal deviate.}
+
+\item{upper}{Logical. If \code{TRUE} (default), returns upper bound; if
+\code{FALSE}, returns lower bound.}
 }
 \value{
 A string in scientific notation.

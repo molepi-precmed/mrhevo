@@ -18,9 +18,21 @@
 ## Environment for package global variables
 mrhevo.env <- new.env(parent=emptyenv())
 
+## Suppress R CMD check notes for data.table column names and stats functions
+## used inside data.table expressions or ggplot2 aesthetics.
+utils::globalVariables(c(
+    ".", "i",
+    "theta_IV", "gamma_hat", "alpha_hat", "se.alpha_hat", "se.gamma_hat",
+    "se.theta_IV", "size.theta_IV", "inv.var",
+    "Estimate", "SE", "z", "pvalue", "pvalue.formatted",
+    "variable",
+    "rownum", "logl.fit", "logl.quad", "loglik", "curve", "posterior"
+))
+
 #' @import doParallel
 #' @import foreach
 #' @importFrom utils packageVersion
+#' @importFrom stats pnorm qt lm density glm as.formula cor
 .onAttach <- function(libname, pkgname) {
     ## put a cap on the number of cores used by default
     if (is.null(getOption("cores")))
@@ -107,3 +119,20 @@ install_mrhevo_stan <- function(repos=getOption("repos")) {
     utils::install.packages(missing, repos=repos)
     invisible(NULL)
 }
+
+#' Example dataset for MRHevo analysis.
+#'
+#' A data.table containing summary statistics for genetic instruments used
+#' in an exemplar Mendelian randomisation analysis.
+#'
+#' @format A data.table with columns:
+#' \describe{
+#'   \item{scoreid}{Identifier for the genetic score/instrument.}
+#'   \item{qtlname}{Name of the quantitative trait locus.}
+#'   \item{alpha_hat}{Estimated coefficient for effect of instrument on exposure.}
+#'   \item{se.alpha_hat}{Standard error of \code{alpha_hat}.}
+#'   \item{gamma_hat}{Estimated coefficient for effect of instrument on outcome.}
+#'   \item{se.gamma_hat}{Standard error of \code{gamma_hat}.}
+#' }
+#' @source Exemplar dataset bundled with the mrhevo package.
+"coeffs.dt"
