@@ -17,7 +17,7 @@ note <- crayon::green
 warn <- crayon::yellow
 bold <- crayon::bold
 
-#' Output a consisted header message.
+#' Output a header message.
 #'
 #' @param message Message to output.
 #'
@@ -113,7 +113,6 @@ format.z.aspvalue <- function(z, sigfig=1, neglogp.threshold.scinot=3,
 get_summarystatsforMR <- function(Y, Z, X_u) {
     YXZ.dt <- data.table(y=Y, Z, X_u)
     ## loop over instruments to fit regression of Y on Z, adjusted for X_u
-    ## FIXME: implement a score test or parallelize
     coeffs <- foreach(i = seq_len(ncol(Z)),
                       .combine=function(...) rbind(..., fill=TRUE),
                       .multicombine=TRUE) %dopar% {
@@ -627,21 +626,27 @@ set.tau0 <- function(fraction_pleio=NULL, nu_global=1, J, info) {
 #' @param se.gamma_hat Vector of standard errors for coefficients gamma_hat.
 #' @param theta Maximum likelihood estimate of causal effect (slope).
 #' @param qtlname Optional vector of QTL names for labeling points.
+#' @param highlight Optional logical vector; points where TRUE are coloured red
+#'        (e.g. to mark the cis-pQTL). Other points are black.
 #'
 #' @return A ggplot object showing IV estimates with MLE as line through origin.
 #'
 #' @import ggplot2 data.table
 #' @importFrom ggrepel geom_text_repel
 #' @export
-plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, theta, qtlname = NULL) {
+plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
+                               theta, qtlname = NULL, highlight = NULL) {
     theta_IV <- gamma_hat / alpha_hat
     se.theta_IV <- se.gamma_hat / abs(alpha_hat)
 
     iv.dt <- data.table(
-        alpha_hat = alpha_hat,
-        gamma_hat = gamma_hat,
-        theta_IV = theta_IV,
-        se.theta_IV = se.theta_IV
+        alpha_hat    = alpha_hat,
+        gamma_hat    = gamma_hat,
+        se.gamma_hat = se.gamma_hat,
+        theta_IV     = theta_IV,
+        se.theta_IV  = se.theta_IV,
+        pt_color     = if (!is.null(highlight)) ifelse(highlight, "red", "black")
+                       else "black"
     )
 
     if (!is.null(qtlname)) {
@@ -649,7 +654,9 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
     }
 
     p <- ggplot(iv.dt, aes(x = alpha_hat, y = gamma_hat)) +
-        geom_point(size = 3, alpha = 0.7) +
+        geom_point(aes(size = 1 / se.gamma_hat, color = pt_color), alpha = 0.7) +
+        scale_size_continuous(range = c(0.5, 3), guide = "none") +
+        scale_color_identity(guide = "none") +
         geom_hline(yintercept = 0, color = "black", linewidth = 0.5) +
         geom_vline(xintercept = 0, color = "black", linewidth = 0.5) +
         geom_abline(intercept = 0, slope = theta,
@@ -661,7 +668,9 @@ plot_iv_estimates <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat, 
         theme(legend.position = "none")
 
     if (!is.null(qtlname)) {
-        p <- p + geom_text_repel(aes(label = qtlname), size = 2.5, max.overlaps = 20)
+        p <- p + geom_text_repel(aes(label = qtlname), size = 2.5,
+                                  max.overlaps = 30, fontface = "italic",
+                                  color = "blue")
     }
 
     return(p)
@@ -792,7 +801,7 @@ plot_kappa_hist <- function(fit, bin_width = 0.02) {
     return(p)
 }
 
-#' Run Stan model for Mendelian randomization using NumPyro.
+#' Run model for Mendelian randomization using NumPyro.
 #'
 #' @param alpha_hat Vector of estimated coefficients for effect of instruments
 #'        on exposure.

@@ -182,3 +182,75 @@ foreach(i = 1:n, .combine = rbind) %dopar% {
 - Stan model files must be in the package root or specified via `model.dir`
 - The package targets R >= 4.0
 - Use roxygen2 to regenerate NAMESPACE after adding exports
+
+## 5. Computing instrument-exposure coefficients from summary statistics
+
+The method is described in `theorymethods.Rmd` (rendered as `theorymethods.pdf`), section
+"Constructing scalar instruments from multiple SNPs".  The script `compute_alpha.R`
+implements task (1): given GWAS summary statistics for SNP-exposure associations, compute
+for each locus the scalar instrument-exposure coefficient `alpha_hat` and its standard error.
+
+### Inputs
+
+| File | Description |
+|------|-------------|
+| `pdcd1_stats/OID00791_OID21396_SCALLOP_UKBB_MA_rsidannotated_filtered.tsv` | Meta-analysis summary statistics for PDCD1 protein (SCALLOP + UKBB); ~13k SNPs, ~47–50k N per variant, hg38 |
+| `refpop/kg.2020.hg38.eur.bed/.bim/.fam` | 1000 Genomes EUR reference panel; 503 samples, 33M SNPs, hg38 |
+
+Two meta-analyses are available (OID00791 and OID01098); OID00791 is used because it has
+consistent sample sizes throughout.  OID01098 has some variants with N as low as 860.
+
+### Algorithm
+
+1. **Load summary statistics** (`chr`, `pos`, `rsid`, `Allele1`, `Allele2`, `Freq1`,
+   `Effect`, `StdErr`, `TotalSampleSize`).
+
+2. **Define loci**: sort by chr/pos; a gap > `gap_mb` (default 1 Mb) between adjacent
+   SNPs on the same chromosome starts a new locus.
+
+3. **Match to reference panel**: read the `.bim` file; join on `rsid`; align alleles
+   (flip `Effect` and `Freq1` when the effect allele matches `a2` in the bim).
+   Drop strand-ambiguous SNPs (A/T, C/G) and SNPs absent from the reference panel.
+
+4. **Open reference panel** via `BEDMatrix` (memory-mapped; does not load the full
+   4 GB `.bed` file into RAM).
+
+5. **Per-locus computation**:
+   - Extract genotype matrix *G* [503 × k]; impute missing values to column means;
+     standardise columns (zero mean, unit SD).
+   - Compute correlation matrix **Σ_g** = `cor(G_std)`.
+   - Compute truncated pseudoinverse of **Σ_g** via eigendecomposition, retaining only
+     eigenvalues above `min_eig_frac` (default 0.01) × max eigenvalue.  This handles
+     ill-conditioned matrices such as the HLA region on chromosome 6, where many SNPs
+     are in high LD.  The number of retained eigenvalues (`eff_rank`) is reported for
+     each locus.
+   - Compute multivariable coefficients **α_m** = **Σ_g**⁻¹ **α_u**.
+   - `alpha_hat` = ‖**α_m**‖.
+   - Estimate Var(*Z*) empirically from reference panel scores *Z_i* = (*G_i* · **α_m**) / ‖**α_m**‖.
+   - Estimate *σ_X*² per SNP from allele frequency, SE, and N (formula in `theorymethods.Rmd`);
+     take the median across the locus.
+   - Compute SE via Fisher information:
+     `se.alpha_hat = 1 / sqrt(N * Var(Z) / (sigma_X^2 - alpha_hat^2 * Var(Z)))`.
+
+6. **Output**: `alpha_pdcd1_OID00791.rds` — a `data.table` with one row per locus and
+   columns `qtlname`, `chr`, `locus_start`, `locus_end`, `n_snps`, `eff_rank`,
+   `alpha_hat`, `se.alpha_hat`.  This feeds into `coeffs.dt` for the MR-Hevo
+   Bayesian analysis (see `runmrhevo.R`).
+
+### Key parameters
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `gap_mb` | 1.0 | Mb gap between SNPs that defines a new locus boundary |
+| `min_eig_frac` | 0.01 | Eigenvalue truncation threshold for pseudoinverse |
+
+### Running
+
+```bash
+cd /mnt/pmd/mrhevo
+Rscript compute_alpha.R
+```
+
+Requires R packages `data.table` and `BEDMatrix` (`install.packages("BEDMatrix")`).
+Reading the 33M-row bim index takes ~30 s; per-locus processing is then fast except
+for large, high-LD loci (e.g. HLA).

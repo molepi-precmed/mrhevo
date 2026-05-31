@@ -1,0 +1,375 @@
+---
+title: "Causal effect of PDCD1 protein on type 1 diabetes: MR-Hevo analysis"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: pdflatex
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{caption}
+  - \captionsetup[longtable]{width=\linewidth}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.align = "center")
+options(knitr.kable.NA = "")
+library(data.table)
+library(ggplot2)
+library(ggrepel)
+library(knitr)
+library(kableExtra)
+devtools::load_all(".", quiet = TRUE)
+```
+
+```{r load-data}
+## ---- Load protein-coding gene spans (used for NA gene filling) ----
+genes_coding <- fread("refGene.txt.gz", header = FALSE,
+                      select = c(2L, 3L, 5L, 6L, 13L),
+                      col.names = c("accession", "chrom", "txStart", "txEnd", "symbol"))
+genes_coding[, chr_g := suppressWarnings(as.integer(sub("^chr", "", chrom)))]
+genes_coding <- genes_coding[!is.na(chr_g) & startsWith(accession, "NM_")]
+genes_coding <- genes_coding[, .(txStart = min(txStart), txEnd = max(txEnd)),
+                               by = .(chr = chr_g, symbol)]
+
+## Fill NA gene entries with protein-coding genes whose txStart or txEnd
+## falls within the locus span [locus_start, locus_end].
+fill_na_genes <- function(dt) {
+    na_idx <- which(is.na(dt$gene))
+    if (length(na_idx) == 0L) return(dt)
+    for (i in na_idx) {
+        chr_i   <- as.integer(dt$chr[i])
+        start_i <- dt$locus_start[i]
+        end_i   <- dt$locus_end[i]
+        hits <- genes_coding[chr == chr_i &
+                              ((txStart >= start_i & txStart <= end_i) |
+                               (txEnd   >= start_i & txEnd   <= end_i))]
+        if (nrow(hits) > 0L)
+            dt$gene[i] <- paste(unique(hits$symbol), collapse = ", ")
+    }
+    dt
+}
+
+## Return the qtlname of the chr2 locus nearest to PDCD1 (hg38 midpoint ~241.86 Mb)
+find_cis <- function(dt) {
+    pdcd1_mid <- 241858000L
+    chr2 <- dt[chr == "2"]
+    if (nrow(chr2) == 0L) return(character(0))
+    chr2$qtlname[which.min(abs(chr2$locus_start - pdcd1_mid))]
+}
+
+## ---- Build per-dataset coefficient tables ----
+make_coeffs <- function(alpha_rds, gamma_rds, genes_rds) {
+    alpha_dt <- readRDS(alpha_rds)
+    gamma_dt  <- readRDS(gamma_rds)
+    extra_cols <- intersect(c("sd.Z"), names(alpha_dt))
+    alpha_sel  <- c("qtlname", "chr", "locus_start", "locus_end",
+                    "n_snps", "eff_rank", "alpha_hat", "se.alpha_hat", extra_cols)
+    dt <- merge(
+        alpha_dt[, ..alpha_sel],
+        gamma_dt[, .(qtlname, gamma_hat, se.gamma_hat)],
+        by = "qtlname"
+    )
+    dt[, chr := as.character(chr)]
+    dt <- get_coeffratios(dt, use.delta = TRUE)
+    genes <- readRDS(genes_rds)
+    dt <- merge(dt, genes, by = "qtlname", all.x = TRUE)
+    dt <- fill_na_genes(dt)
+    dt[, chr_sort := suppressWarnings(as.integer(chr))]
+    dt[chr == "X", chr_sort := 23L]
+    dt[chr == "Y", chr_sort := 24L]
+    setorder(dt, chr_sort, locus_start)
+    dt[, chr_sort := NULL]
+    dt
+}
+
+## SCALLOP/UKBB analysis commented out
+# coeffs_sc <- make_coeffs("alpha_pdcd1_OID00791.rds", "gamma_t1d.rds", "locus_genes.rds")
+# cis_sc    <- find_cis(coeffs_sc)
+# ivw_sc    <- get_estimatorsMR(coeffs_sc)
+
+coeffs_ukb <- make_coeffs("alpha_pdcd1_UKB.rds",
+                            "gamma_t1d_ukb.rds",
+                            "locus_genes_ukb.rds")
+cis_ukb       <- find_cis(coeffs_ukb)
+ivw_ukb       <- get_estimatorsMR(coeffs_ukb)
+ivw_ukb_trans <- get_estimatorsMR(coeffs_ukb[qtlname != cis_ukb])
+
+## ---- Load individual-level T1D coefficients ----
+indiv_raw <- fread("pdcd1.mr.coeffs.csv")
+setnames(indiv_raw,
+         c("chrom", "startpos", "endpos", "alpha.hat", "se.alpha.hat"),
+         c("chr",   "locus_start", "locus_end", "alpha_hat", "se.alpha_hat"))
+indiv_raw[, chr := as.character(chr)]
+## gene label: first entry in the comma-separated gene list
+indiv_raw[, gene := sub(",.*$", "", qtlname)]
+indiv_raw[, chr_sort := suppressWarnings(as.integer(chr))]
+indiv_raw[chr == "X", chr_sort := 23L]
+indiv_raw[chr == "Y", chr_sort := 24L]
+setorder(indiv_raw, chr_sort, locus_start)
+indiv_raw[, chr_sort := NULL]
+
+indiv_dt <- get_coeffratios(indiv_raw, use.delta = TRUE)
+
+## ---- User-provided gene label overrides ----
+## Keyed by (chr, position range in bp); applied consistently across all three datasets.
+gene_overrides <- list(
+    list(chr =  1L, lo = 113e6, hi = 115e6, gene = "PTPN22"),
+    list(chr =  2L, lo = 240e6, hi = 243e6, gene = "PDCD1"),
+    list(chr =  9L, lo =   5e6, hi =   6e6, gene = "CD274"),
+    list(chr = 10L, lo =   5e6, hi =   7e6, gene = "IL15RA"),
+    list(chr = 12L, lo = 109e6, hi = 113e6, gene = "SH2B3"),
+    list(chr = 19L, lo =  48e6, hi =  50e6, gene = "FUT2")
+)
+apply_gene_overrides <- function(dt) {
+    for (ov in gene_overrides) {
+        idx <- which(as.integer(dt$chr) == ov$chr &
+                     dt$locus_start >= ov$lo &
+                     dt$locus_start <= ov$hi)
+        if (length(idx)) set(dt, idx, "gene", ov$gene)
+    }
+    invisible(dt)
+}
+# apply_gene_overrides(coeffs_sc)  # SCALLOP commented out
+apply_gene_overrides(coeffs_ukb)
+apply_gene_overrides(indiv_dt)   # indiv_raw and indiv_dt are the same data.table
+
+cis_indiv     <- indiv_dt[qtl_type == "cis-x", scoreid]
+ivw_indiv     <- get_estimatorsMR(indiv_dt)
+ivw_indiv_trans <- get_estimatorsMR(indiv_dt[!(scoreid %in% cis_indiv)])
+```
+
+# Introduction
+
+We estimate the causal effect of circulating PDCD1 (programmed cell death protein 1)
+levels on risk of type 1 diabetes (T1D) using Mendelian randomization with the
+regularized horseshoe prior (MR-Hevo).
+
+Results are presented from two analyses:
+
+1. **Individual-level T1D outcome (Zhou et al.)**: instrument-exposure coefficients
+   from the UK Biobank Olink proteomics study ($N = 33{,}902$); instrument-outcome
+   coefficients estimated from individual-level genotype--phenotype data.
+
+2. **Summary-level T1D outcome, UK Biobank SNP--protein coefficients**: both sets of
+   coefficients from summary statistics, with SNP--protein associations from the
+   UK Biobank Olink study ($N = 33{,}902$) and SNP--T1D associations from
+   Iakovliev et al.\ (Am J Hum Genet 2023; 4,964 cases, 7,497 controls).
+   LD matrices from the UK Biobank EUR panel (362,063 samples, 18 million variants)
+   were used to construct scalar instruments.
+
+Scalar genetic instruments are constructed from loci associated with PDCD1 at
+$p < 10^{-6}$, excluding the HLA region (chromosome 6: 25--34 Mb).
+Each scalar instrument $Z$ is a linear combination of SNPs within the locus,
+constructed so that $\mathrm{SD}(Z) = 1$ in the target dataset.
+The instrument-exposure coefficient $\hat\alpha$ is therefore the expected change
+in the exposure per change of 1 SD in the scalar instrument $Z$;
+it can be interpreted directly as the strength of the instrument.
+Throughout this report all displayed values of $\hat\alpha$ and $\hat\gamma$ are
+in per-SD($Z$) units, obtained by multiplying the per-unit-$Z$ coefficients
+(as stored in the intermediate \texttt{.rds}/\texttt{.csv} files) by
+$\mathrm{SD}(Z)$.
+
+```{r instruments-chunk, echo=FALSE}
+make_table <- function(dt, label, caption_extra = "",
+                        has_eff_rank = TRUE, has_sd_z = FALSE,
+                        scale_by_sdz = FALSE, small_font = FALSE) {
+    sdz <- if (scale_by_sdz && "sd.Z" %in% names(dt)) dt$sd.Z else 1
+    base_cols <- list(
+        `Nearest Gene`         = dt$gene,
+        Chr                    = dt$chr,
+        `Pos (Mb)`             = round(dt$locus_start / 1e6, 2),
+        `Width (Mb)`           = round((dt$locus_end - dt$locus_start) / 1e6, 2),
+        `Num SNPs`             = dt$n_snps
+    )
+    if (has_eff_rank)
+        base_cols[["eff rank"]] <- dt$eff_rank
+    if (has_sd_z)
+        base_cols[["SD($Z$)"]] <- round(dt$sd.Z, 3)
+    base_cols[["$\\hat\\alpha$ (SE)"]] <- sprintf("%.4f (%.4f)", dt$alpha_hat * sdz, dt$se.alpha_hat * sdz)
+    base_cols[["$\\hat\\gamma$ (SE)"]] <- sprintf("%.4f (%.4f)", dt$gamma_hat * sdz, dt$se.gamma_hat * sdz)
+    base_cols[["*"]]                   <- ifelse(abs(dt$gamma_hat / dt$se.gamma_hat) > qnorm(0.995), "*", "")
+    tab <- as.data.table(base_cols)
+
+    eff_rank_note <- if (has_eff_rank) "eff rank: effective rank of LD matrix. " else ""
+    sd_z_note     <- if (has_sd_z) "SD($Z$): standard deviation of scalar instrument in reference panel. " else ""
+    k <- kable(tab, format = "latex", booktabs = TRUE, escape = FALSE,
+          longtable = TRUE,
+          caption = paste0(
+              "Instrument coefficients", caption_extra, ". ",
+              "Nearest Gene: protein-coding gene(s) nearest to or overlapping the locus. ",
+              "Num SNPs: SNPs in locus; ", eff_rank_note, sd_z_note,
+              "$\\hat\\alpha$ and $\\hat\\gamma$: instrument-exposure and ",
+              "instrument-outcome coefficients per SD of the scalar instrument (SE in parentheses). ",
+              "*: $|\\hat\\gamma / \\mathrm{SE}(\\hat\\gamma)| > 2.58$ ",
+              "(two-sided $p < 0.01$)."
+          ),
+          label = label) |>
+        kable_styling(latex_options = c("repeat_header", "striped"),
+                      font_size = if (small_font) 8 else NULL) |>
+        column_spec(1, width = "2.5cm")
+    k
+}
+```
+
+# Data sources
+
+The following source data files are used in this analysis.
+
+| File | Description | Source |
+|------|-------------|--------|
+| `PDCD1_Q15116_OID21396_v1_Oncology.tar` | SNP--protein GWAS summary statistics for PDCD1 (UniProt Q15116; Olink Oncology panel, assay OID21396); $N = 33{,}902$ UK Biobank participants of European ancestry | UK Biobank Pharma Proteomics Project (UKB-PPP); Sun et al.\ (2023) *Nature* 622:329--338 |
+| `gwasresults.RData.gz` | Type 1 diabetes GWAS summary statistics; 4,964 cases and 7,497 controls | Iakovliev et al.\ (2023) *Am J Hum Genet* 110:1718--1732 |
+| `pdcd1.mr.coeffs.csv` | Scalar instrument--exposure ($\hat\alpha$) and instrument--outcome ($\hat\gamma$) coefficients from the individual-level MR analysis, with scalar instruments constructed using LD from the 1000 Genomes EUR panel | Computed by Zhou et al.\ from UK Biobank Olink proteomics and individual-level T1D genotype--phenotype data |
+| `LD_Eur_18mvariants/int8/` (genoscores) | Block-LD matrix for UK Biobank participants of European ancestry; $N = 362{,}063$ samples; ${\sim}18$ million variants; GRCh37 coordinates; quantized to int8 | UK Biobank; computed using magenpy |
+| `refpop/kg.2020.hg38.eur.bim` | Variant index (rsid, chromosome, position hg38) for the 1000 Genomes EUR reference panel; 503 samples; used for (chr, pos) $\to$ rsid lookup | 1000 Genomes Project phase 3, GRCh38 liftover |
+| `refGene.txt.gz` | RefSeq protein-coding gene annotations (NM\_ accessions); used to label loci with the nearest gene | UCSC Genome Browser, hg38 assembly |
+
+# Individual-level T1D outcome (Zhou et al.)
+
+`r nrow(indiv_dt)` scalar instruments from the UK Biobank Olink proteomics study
+($N = 33{,}902$), with instrument-outcome coefficients estimated from
+individual-level genotype-outcome data in the T1D case-control study (Zhou et al.).
+Nearest Gene lists all protein-coding genes at the locus.
+
+\newpage
+
+```{r instruments-table-indiv, results='asis'}
+make_table(indiv_dt, label = "instruments-indiv",
+           caption_extra = " --- UK Biobank, individual-level T1D outcome (Zhou et al.)",
+           has_eff_rank = FALSE)
+```
+
+# UK Biobank --- summary-level T1D outcome
+
+`r nrow(coeffs_ukb)` scalar instruments from the UK Biobank Olink proteomics
+study ($N = 33{,}902$). Instrument-outcome coefficients from Iakovliev et al.
+
+\newpage
+
+```{r instruments-table-ukb, results='asis'}
+make_table(coeffs_ukb, label = "instruments-ukb",
+           caption_extra = " --- UK Biobank SNP--protein coefficients, summary-level T1D",
+           has_sd_z = "sd.Z" %in% names(coeffs_ukb),
+           scale_by_sdz = TRUE,
+           small_font = TRUE)
+```
+
+\clearpage
+
+```{r scatter-indiv, fig.cap=paste0("UK Biobank, individual-level T1D (Zhou et al.): $\\hat{\\gamma}$ vs $\\hat{\\alpha}$ (both per SD of scalar instrument) for ", nrow(indiv_dt), " instruments. IVW slope estimated from trans-pQTLs only: $\\hat\\theta = ", round(ivw_indiv_trans$Estimate, 3), "$ (SE $", round(ivw_indiv_trans$SE, 3), "$, $p = ", ivw_indiv_trans$pvalue.formatted, "$). Red dashed line: IVW slope (trans only). Red point: PDCD1 cis-pQTL."), fig.width = 7, fig.height = 6}
+plot_iv_estimates(
+    alpha_hat    = indiv_dt$alpha_hat,
+    se.alpha_hat = indiv_dt$se.alpha_hat,
+    gamma_hat    = indiv_dt$gamma_hat,
+    se.gamma_hat = indiv_dt$se.gamma_hat,
+    theta        = ivw_indiv_trans$Estimate,
+    qtlname      = indiv_dt$gene,
+    highlight    = indiv_dt$scoreid %in% cis_indiv
+)
+```
+
+```{r scatter-ukb, fig.cap=paste0("UK Biobank (summary-level T1D): $\\hat{\\gamma}$ vs $\\hat{\\alpha}$ (both per SD of scalar instrument) for ", nrow(coeffs_ukb), " instruments. IVW slope estimated from trans-pQTLs only: $\\hat\\theta = ", round(ivw_ukb_trans$Estimate, 3), "$ (SE $", round(ivw_ukb_trans$SE, 3), "$, $p = ", ivw_ukb_trans$pvalue.formatted, "$). Red dashed line: IVW slope (trans only). Red point: PDCD1 cis-pQTL."), fig.width = 7, fig.height = 6}
+sdz <- coeffs_ukb$sd.Z
+plot_iv_estimates(
+    alpha_hat    = coeffs_ukb$alpha_hat    * sdz,
+    se.alpha_hat = coeffs_ukb$se.alpha_hat * sdz,
+    gamma_hat    = coeffs_ukb$gamma_hat    * sdz,
+    se.gamma_hat = coeffs_ukb$se.gamma_hat * sdz,
+    theta        = ivw_ukb_trans$Estimate,
+    qtlname      = sub(",.*$", "", coeffs_ukb$gene),
+    highlight    = coeffs_ukb$qtlname == cis_ukb
+)
+```
+
+# Comparison of $\hat\alpha$ coefficients across analyses
+
+```{r alpha-compare, fig.cap="Instrument-exposure coefficient $\\hat{\\alpha}$ (per SD of scalar instrument) from the individual-level analysis (x-axis) versus the UK Biobank summary-level analysis (y-axis). Loci matched by chromosomal overlap. Grey dashed line: identity ($y=x$). Blue dotted line: OLS regression through the origin.", fig.width = 6, fig.height = 6}
+dt_indiv <- indiv_dt[,  .(gene = gene, chr, lo = locus_start, hi = locus_end,
+                           alpha_indiv = alpha_hat)]
+dt_ukb   <- coeffs_ukb[, .(chr, lo = locus_start, hi = locus_end,
+                             alpha_ukb = alpha_hat * sd.Z)]
+setkeyv(dt_ukb,   c("chr", "lo", "hi"))
+setkeyv(dt_indiv, c("chr", "lo", "hi"))
+alpha_comp <- foverlaps(dt_indiv, dt_ukb, nomatch = 0L)
+
+slope_ols <- coef(lm(alpha_ukb ~ 0 + alpha_indiv, data = alpha_comp))["alpha_indiv"]
+ax_breaks <- pretty(c(0, max(alpha_comp$alpha_indiv, alpha_comp$alpha_ukb, na.rm = TRUE)))
+
+ggplot(alpha_comp, aes(x = alpha_indiv, y = alpha_ukb)) +
+    geom_hline(yintercept = 0, linewidth = 0.4) +
+    geom_vline(xintercept = 0, linewidth = 0.4) +
+    geom_abline(slope = 1,         intercept = 0, linetype = "dashed", colour = "grey50") +
+    geom_abline(slope = slope_ols, intercept = 0, linetype = "dotted", colour = "blue") +
+    geom_point() +
+    geom_text_repel(aes(label = gene), size = 3, max.overlaps = Inf) +
+    scale_x_continuous(breaks = ax_breaks, limits = range(ax_breaks)) +
+    scale_y_continuous(breaks = ax_breaks, limits = range(ax_breaks)) +
+    labs(x = expression(hat(alpha)[indiv]),
+         y = expression(hat(alpha)[UKB])) +
+    coord_fixed() +
+    theme_bw()
+```
+
+# Comparison of $\hat\gamma$ coefficients across analyses
+
+```{r gamma-compare, fig.cap="Instrument-outcome coefficient $\\hat{\\gamma}$ (per SD of scalar instrument, in log-odds units) from the individual-level analysis (x-axis) versus the UK Biobank summary-level analysis (y-axis). Loci matched by chromosomal overlap. Grey dashed line: identity ($y=x$). Blue dotted line: OLS regression through the origin.", fig.width = 6, fig.height = 6}
+dt_indiv_g <- indiv_dt[,  .(gene = gene, chr, lo = locus_start, hi = locus_end,
+                              gamma_indiv = gamma_hat)]
+dt_ukb_g   <- coeffs_ukb[, .(chr, lo = locus_start, hi = locus_end,
+                               gamma_ukb = gamma_hat * sd.Z)]
+setkeyv(dt_ukb_g,   c("chr", "lo", "hi"))
+setkeyv(dt_indiv_g, c("chr", "lo", "hi"))
+gamma_comp <- foverlaps(dt_indiv_g, dt_ukb_g, nomatch = 0L)
+
+slope_ols_g <- coef(lm(gamma_ukb ~ 0 + gamma_indiv, data = gamma_comp))["gamma_indiv"]
+ax_lim_g    <- max(abs(c(gamma_comp$gamma_indiv, gamma_comp$gamma_ukb)), na.rm = TRUE) * 1.05
+ax_breaks_g <- pretty(c(-ax_lim_g, ax_lim_g))
+
+ggplot(gamma_comp, aes(x = gamma_indiv, y = gamma_ukb)) +
+    geom_hline(yintercept = 0, linewidth = 0.4) +
+    geom_vline(xintercept = 0, linewidth = 0.4) +
+    geom_abline(slope = 1,           intercept = 0, linetype = "dashed", colour = "grey50") +
+    geom_abline(slope = slope_ols_g, intercept = 0, linetype = "dotted", colour = "blue") +
+    geom_point() +
+    geom_text_repel(aes(label = gene), size = 3, max.overlaps = Inf) +
+    scale_x_continuous(breaks = ax_breaks_g, limits = range(ax_breaks_g)) +
+    scale_y_continuous(breaks = ax_breaks_g, limits = range(ax_breaks_g)) +
+    labs(x = expression(hat(gamma)[indiv]),
+         y = expression(hat(gamma)[UKB])) +
+    coord_fixed() +
+    theme_bw()
+```
+
+<!-- SCALLOP/UKBB section commented out
+# SCALLOP/UKBB --- summary-level T1D outcome
+
+```{r instruments-table-sc, eval=FALSE, include=FALSE}
+make_table(coeffs_sc, label = "instruments-sc",
+           caption_extra = " --- SCALLOP/UKBB SNP--protein coefficients, summary-level T1D")
+```
+
+```{r scatter-sc, eval=FALSE, include=FALSE}
+plot_iv_estimates(
+    alpha_hat    = coeffs_sc$alpha_hat,
+    se.alpha_hat = coeffs_sc$se.alpha_hat,
+    gamma_hat    = coeffs_sc$gamma_hat,
+    se.gamma_hat = coeffs_sc$se.gamma_hat,
+    theta        = ivw_sc$Estimate,
+    qtlname      = coeffs_sc$gene,
+    highlight    = coeffs_sc$qtlname == cis_sc
+)
+```
+-->
+
+```{r mrhevo-results, results='asis'}
+if (!file.exists("mrhevo_pdcd1_t1d_fit.rds")) {
+    cat("\\textit{MR-Hevo posterior results not yet available.",
+        "Run \\texttt{run\\_mrhevo\\_pdcd1\\_t1d.R} to generate",
+        "\\texttt{mrhevo\\_pdcd1\\_t1d\\_fit.rds}.}\n")
+}
+```
