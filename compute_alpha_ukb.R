@@ -189,6 +189,7 @@ alpha_dt <- rbindlist(lapply(response, function(r) data.table(
     locus_end    = as.integer(r$locus_end),
     n_snps       = as.integer(r$n_snps),
     eff_rank     = as.integer(r$eff_rank),
+    n_ld_blocks  = as.integer(r$n_ld_blocks),
     alpha_hat    = as.numeric(r$alpha_hat),
     se.alpha_hat = as.numeric(r$se_alpha_hat),
     sd.Z         = as.numeric(r$sd_Z)

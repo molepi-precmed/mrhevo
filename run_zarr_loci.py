@@ -89,6 +89,31 @@ def _get_ld_submatrix(zarr_dir, chrom, rsids):
     return C_g, ld_snps
 
 
+def _count_ld_blocks(Cg):
+    """Count connected components of the LD graph (off-diagonal non-zeros = edges).
+    A locus spanning multiple zarr LD blocks will appear as a disconnected graph."""
+    n = Cg.shape[0]
+    if n <= 1:
+        return 1
+    visited = [False] * n
+    count   = 0
+    for start in range(n):
+        if visited[start]:
+            continue
+        count += 1
+        stack = [start]
+        while stack:
+            v = stack.pop()
+            if visited[v]:
+                continue
+            visited[v] = True
+            for nb in np.where(Cg[v] != 0.0)[0]:
+                nb = int(nb)
+                if nb != v and not visited[nb]:
+                    stack.append(nb)
+    return count
+
+
 def _trunc_pseudoinv(S, min_eig_frac):
     """Return (V_k, d_inv, eff_rank) factored pseudoinverse of symmetric S."""
     eigvals, eigvecs = np.linalg.eigh(S)
@@ -125,8 +150,9 @@ def _align_snps(snps, C_g, ld_snps):
             continue   # allele mismatch
 
         row = dict(s)
-        row['Effect'] = -s['Effect'] if flip else s['Effect']
-        row['Freq1']  = 1.0 - s['Freq1'] if flip else s['Freq1']
+        row['Effect']   = -s['Effect'] if flip else s['Effect']
+        row['Freq1']    = 1.0 - s['Freq1'] if flip else s['Freq1']
+        row['_flipped'] = flip   # track for beta_m direction correction
         if 'z_gamma' in s:
             row['z_gamma'] = -s['z_gamma'] if flip else s['z_gamma']
         merged.append(row)
@@ -172,10 +198,12 @@ def _compute_alpha(snps_aln, Cg, min_eig_frac):
     denom      = sigma_X_sq - var_S
     se_alpha   = (1.0 / np.sqrt(N_alpha * var_Z / denom)) if denom > 0.0 else None
 
-    positions = [s['pos'] for s in snps_aln]
+    positions    = [s['pos'] for s in snps_aln]
+    n_ld_blocks  = _count_ld_blocks(Cg)
     return {
         'n_snps':       k,
         'eff_rank':     eff_rank,
+        'n_ld_blocks':  n_ld_blocks,
         'locus_start':  int(min(positions)),
         'locus_end':    int(max(positions)),
         'alpha_hat':    alpha_hat,
@@ -241,16 +269,26 @@ def process_loci(job):
                 f'  {lid}: n_snps={n_snps}, eff_rank={eff_rank} (high LD, truncated)\n'
             )
 
+        # beta_m in Allele1 (bim_a1) direction: negate weights for zarr-flipped SNPs
+        beta_m = alpha_res['_alpha_m'] / alpha_res['_sigma_j']
+        beta_m_weights = [
+            {'rsid': s['rsid'], 'Allele1': s['Allele1'],
+             'weight': float(-bm if s.get('_flipped', False) else bm)}
+            for s, bm in zip(snps_aln, beta_m)
+        ]
+
         r = {
-            'locus_id':    lid,
-            'chr':         chrom,
-            'locus_start': alpha_res['locus_start'],
-            'locus_end':   alpha_res['locus_end'],
-            'n_snps':      n_snps,
-            'eff_rank':    eff_rank,
-            'alpha_hat':   alpha_res['alpha_hat'],
-            'se_alpha_hat':alpha_res['se_alpha_hat'],
-            'sd_Z':        alpha_res['sd_Z'],
+            'locus_id':       lid,
+            'chr':            chrom,
+            'locus_start':    alpha_res['locus_start'],
+            'locus_end':      alpha_res['locus_end'],
+            'n_snps':         n_snps,
+            'eff_rank':       eff_rank,
+            'n_ld_blocks':    alpha_res['n_ld_blocks'],
+            'alpha_hat':      alpha_res['alpha_hat'],
+            'se_alpha_hat':   alpha_res['se_alpha_hat'],
+            'sd_Z':           alpha_res['sd_Z'],
+            'beta_m_weights': beta_m_weights,
         }
 
         if do_gamma:

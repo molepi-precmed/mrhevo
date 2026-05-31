@@ -127,7 +127,52 @@ locus_results <- lapply(job$loci, function(locus) {
         list(rsid = rsid, z_gamma = z)
     })
     snp_out <- Filter(Negate(is.null), snp_out)
-    list(locus_id = lid, chr = locus$chr, snps = snp_out)
+    result  <- list(locus_id = lid, chr = locus$chr, snps = snp_out)
+
+    ## ---- Direct regression of T1D on composite instrument score ----
+    ## Only run when instrument weights (beta_m in Allele1 direction) are provided.
+    has_weights <- !is.null(snps_in[[1L]]$weight)
+    if (has_weights) {
+        weights <- setNames(vapply(snps_in, `[[`, double(1), "weight"), rsids)
+
+        ## Accumulate Z_i = sum_j geno_j * weight_j with mean imputation for missing
+        Z_score <- rep(0, length(sample_idx))
+        n_contrib <- 0L
+        for (k in seq_along(rsids)) {
+            rsid <- rsids[k]; j <- col_j[k]
+            if (is.na(j)) next
+            geno <- tryCatch(as.integer(bed[sample_idx, j]), error = function(e) NULL)
+            if (is.null(geno)) next
+            bim_a1 <- toupper(bim$A1[j])
+            req_a1 <- toupper(allele1[rsid])
+            if (bim_a1 != req_a1) geno <- 2L - geno
+            ## mean-impute missing genotypes before accumulating
+            mu <- mean(geno, na.rm = TRUE)
+            geno[is.na(geno)] <- mu
+            Z_score   <- Z_score + geno * weights[rsid]
+            n_contrib <- n_contrib + 1L
+        }
+
+        if (n_contrib > 0L && sd(Z_score) > 0) {
+            Z_scaled <- Z_score / sd(Z_score)   # unit-SD instrument in target dataset
+            df_Z  <- data.frame(pheno = pheno_vec, Z = Z_scaled, cov_df)
+            fit_Z <- tryCatch(
+                glm(pheno ~ ., data = df_Z, family = binomial),
+                error   = function(e) NULL,
+                warning = function(w) suppressWarnings(
+                    glm(pheno ~ ., data = df_Z, family = binomial)))
+            if (!is.null(fit_Z)) {
+                cf <- tryCatch(coef(summary(fit_Z))["Z", ], error = function(e) NULL)
+                if (!is.null(cf)) {
+                    result$gamma_direct    <- as.numeric(cf["Estimate"])
+                    result$se_gamma_direct <- as.numeric(cf["Std. Error"])
+                    message(sprintf("  %s: gamma_direct = %.4f (SE %.4f)",
+                                    lid, result$gamma_direct, result$se_gamma_direct))
+                }
+            }
+        }
+    }
+    result
 })
 
 ## ---- Write output ----

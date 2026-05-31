@@ -1,8 +1,10 @@
 ## compute_gamma_ukb.R
 ## Compute instrument-outcome coefficient gamma_hat for each locus
 ## using UK Biobank Olink PDCD1 summary stats to define loci,
-## and T1D GWAS z-scores (Iakovliev et al. 2023) as the outcome.
+## and per-SNP T1D z-scores from individual-level SDRNT1BIO/GS logistic regression.
 ##
+## z-scores source: z_scores_gs.rds, computed by compute_gamma_indiv.R via
+##   run_gwas_loci.R on diabepi (individual-level genotypes, aligned to bim_a1).
 ## LD source: UKBB EUR zarr store on genoscores (362k samples, GRCh37, 18M variants).
 ##   SNP matching by rsid (build-agnostic); zarr LD accessed via SSH.
 ## Locus definition: Zhou et al. procedure — hits at p < 1e-6, candidates
@@ -11,7 +13,7 @@
 ## Method: theorymethods.Rmd eqs. 16, 17 (analytical gamma_hat and SE).
 ##
 ## Bim used for: (1) (chr, pos hg38) -> rsid for PDCD1 SNPs;
-##               (2) a1/a2 for allele alignment of PDCD1 and T1D to bim_a1.
+##               (2) a1/a2 for allele alignment of PDCD1 to bim_a1.
 ##               Bim_a1 re-alignment to zarr LD A1 is handled in run_zarr_loci.py.
 
 library(data.table)
@@ -20,7 +22,7 @@ source("ld_functions.R")   # for define_loci_expanded only
 
 ## ---- Parameters ----
 tar_file       <- "pdcd1_stats/PDCD1_Q15116_OID21396_v1_Oncology.tar"
-t1d_file       <- "t1d_stats/data/gwasresults.RData.gz"
+z_scores_file  <- "z_scores_gs.rds"   # per-SNP z-scores from GS individual-level logistic regression
 bim_dir        <- "refpop/bim_by_chr"
 zarr_dir       <- "/opt/datastore/genome/LD_Eur_18mvariants/int8"
 genoscores_host <- "pmckeigue@genoscores.cphs.mvm.ed.ac.uk"
@@ -32,9 +34,9 @@ p_cand         <- 1e-5
 exclude_hla    <- TRUE
 info_threshold <- 0.3
 
-## T1D GWAS sample size (Iakovliev et al. 2023)
-N_cases  <- 4964L
-N_ctrls  <- 7497L
+## Sample size from GS T1D case-control study (SDRNT1BIO cases + GS controls)
+N_cases  <- 4922L
+N_ctrls  <- 7452L
 N_gamma  <- N_cases + N_ctrls
 p_case   <- N_cases / N_gamma
 
@@ -48,19 +50,11 @@ checkpoint <- function(label) {
 }
 checkpoint("start")
 
-## ---- Step 1: Load T1D GWAS summary statistics ----
-message("Loading T1D GWAS summary statistics...")
-tmp_rdata <- tempfile(fileext = ".RData")
-system2("gunzip", args = c("-c", t1d_file), stdout = tmp_rdata)
-load(tmp_rdata); unlink(tmp_rdata)
-t1d <- as.data.table(results); rm(results)
-t1d[, CHR := as.integer(as.character(CHR))]
-setnames(t1d, c("SNP", "CHR", "z"), c("rsid", "chr", "z_t1d"))
-t1d[, c("BP", "minuslog10p") := NULL]
-if (anyDuplicated(t1d$rsid))
-    t1d <- t1d[t1d[, .I[which.max(abs(z_t1d))], by = rsid]$V1]
-setkey(t1d, rsid)
-message(sprintf("  %d T1D SNPs loaded", nrow(t1d)))
+## ---- Step 1: Load directly-computed GS T1D z-scores ----
+message("Loading GS T1D z-scores (from individual-level logistic regression)...")
+z_gs <- readRDS(z_scores_file)   # columns: rsid, locus_id, z_GS
+setkey(z_gs, rsid)
+message(sprintf("  %d per-SNP z-scores across %d loci", nrow(z_gs), uniqueN(z_gs$locus_id)))
 checkpoint("after_load_t1d")
 
 ## ---- Step 2: Load UKB PDCD1 summary statistics ----
@@ -165,10 +159,10 @@ job <- list(
     p_case       = p_case,
     loci = lapply(locus_ids, function(lid) {
         alpha_snps      <- stats[locus_id == lid]
-        candidate_rsids <- intersect(alpha_snps$rsid, t1d$rsid)
+        candidate_rsids <- intersect(alpha_snps$rsid, z_gs$rsid)
         if (length(candidate_rsids) == 0L) return(NULL)
         alpha_snps <- alpha_snps[rsid %in% candidate_rsids]
-        z_vec      <- setNames(t1d[.(candidate_rsids)]$z_t1d, candidate_rsids)
+        z_vec      <- setNames(z_gs[.(candidate_rsids)]$z_GS, candidate_rsids)
         list(
             locus_id = lid,
             chr      = alpha_snps$chr[1L],
