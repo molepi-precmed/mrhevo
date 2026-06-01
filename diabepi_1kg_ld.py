@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-compute_1kg_ld.py  --  runs on diabepi
+diabepi_1kg_ld.py  --  runs on diabepi; master copy kept locally under git.
 Compute a 1000G EUR zarr LD matrix using the same block boundaries as the
 UKBB EUR zarr LD matrix (boundaries lifted from GRCh37 to hg38).
 

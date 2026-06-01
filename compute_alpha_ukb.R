@@ -173,12 +173,12 @@ on.exit({ unlink(c(json_in, json_err, json_out)) }, add = TRUE)
 
 message(sprintf("Sending %d loci to genoscores via SSH...", length(locus_ids)))
 ret <- system(sprintf(
-    "scp -q run_zarr_loci.py '%s':~/ && ssh '%s' 'python3 ~/run_zarr_loci.py' < '%s' > '%s' 2>'%s'",
+    "scp -q genoscores_zarr_loci.py '%s':~/ && ssh '%s' 'python3 ~/genoscores_zarr_loci.py' < '%s' > '%s' 2>'%s'",
     genoscores_host, genoscores_host, json_in, json_out, json_err
 ))
 if (file.exists(json_err) && file.size(json_err) > 0L)
     message(paste(readLines(json_err, warn = FALSE), collapse = "\n"))
-if (ret != 0L) stop("run_zarr_loci.py failed on genoscores (exit ", ret, ")")
+if (ret != 0L) stop("genoscores_zarr_loci.py failed on genoscores (exit ", ret, ")")
 checkpoint("after_loci")
 
 response <- read_json(json_out, simplifyVector = FALSE)$loci

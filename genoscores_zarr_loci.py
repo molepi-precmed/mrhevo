@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-run_zarr_loci.py -- compute alpha and/or gamma coefficients for a set of loci
+genoscores_zarr_loci.py -- compute alpha and/or gamma coefficients for a set of loci
 using the UKBB EUR LD zarr store on genoscores.
+Runs on genoscores; master copy kept locally under git.
 
 Reads JSON from stdin, writes JSON to stdout, progress to stderr.
 

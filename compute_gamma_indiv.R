@@ -4,7 +4,7 @@
 ## estimated from individual-level Gen Scotland genotype/phenotype data.
 ##
 ## Individual-level steps run on diabepi via SSH (no genotype/phenotype data
-## is copied to this machine). run_gwas_loci.R is SCPed to diabepi and run there;
+## is copied to this machine). diabepi_gwas_loci.R is SCPed to diabepi and run there;
 ## it returns only per-SNP z-scores and N_cases/N_ctrls.
 ##
 ## LD adjustment: UKBB EUR zarr store on genoscores (362k samples, GRCh37,
@@ -155,11 +155,11 @@ on.exit({ unlink(c(json_snp, json_z, json_zerr)) }, add = TRUE)
 
 message(sprintf("Sending %d loci to diabepi via SSH...", length(locus_ids)))
 ret <- system(sprintf(
-    "scp -q run_gwas_loci.R '%s':~/ && scp -q '%s' '%s':~/snp_job.json && ssh '%s' 'Rscript ~/run_gwas_loci.R ~/snp_job.json' > '%s' 2>'%s'",
+    "scp -q diabepi_gwas_loci.R '%s':~/ && scp -q '%s' '%s':~/snp_job.json && ssh '%s' 'Rscript ~/diabepi_gwas_loci.R ~/snp_job.json' > '%s' 2>'%s'",
     diabepi_host, json_snp, diabepi_host, diabepi_host, json_z, json_zerr))
 if (file.exists(json_zerr) && file.size(json_zerr) > 0L)
     message(paste(readLines(json_zerr, warn = FALSE), collapse = "\n"))
-if (ret != 0L) stop("run_gwas_loci.R failed on diabepi (exit ", ret, ")")
+if (ret != 0L) stop("diabepi_gwas_loci.R failed on diabepi (exit ", ret, ")")
 checkpoint("after_diabepi")
 
 z_response <- read_json(json_z, simplifyVector = FALSE)
@@ -223,11 +223,11 @@ on.exit({ unlink(c(json_in, json_err, json_out)) }, add = TRUE)
 
 message(sprintf("Sending %d loci to genoscores via SSH...", length(locus_ids)))
 ret <- system(sprintf(
-    "scp -q run_zarr_loci.py '%s':~/ && ssh '%s' 'python3 ~/run_zarr_loci.py' < '%s' > '%s' 2>'%s'",
+    "scp -q genoscores_zarr_loci.py '%s':~/ && ssh '%s' 'python3 ~/genoscores_zarr_loci.py' < '%s' > '%s' 2>'%s'",
     genoscores_host, genoscores_host, json_in, json_out, json_err))
 if (file.exists(json_err) && file.size(json_err) > 0L)
     message(paste(readLines(json_err, warn = FALSE), collapse = "\n"))
-if (ret != 0L) stop("run_zarr_loci.py failed on genoscores (exit ", ret, ")")
+if (ret != 0L) stop("genoscores_zarr_loci.py failed on genoscores (exit ", ret, ")")
 checkpoint("after_genoscores")
 
 response <- read_json(json_out, simplifyVector = FALSE)$loci

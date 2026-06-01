@@ -107,7 +107,7 @@ write_json(alpha_job, json_alpha_in, auto_unbox=TRUE, digits=8)
 on.exit(unlink(c(json_alpha_in, json_alpha_out, json_alpha_err)), add=TRUE)
 
 ret <- system(sprintf(
-    "scp -q run_zarr_loci.py '%s':~/ && ssh '%s' 'python3 ~/run_zarr_loci.py' < '%s' > '%s' 2>'%s'",
+    "scp -q genoscores_zarr_loci.py '%s':~/ && ssh '%s' 'python3 ~/genoscores_zarr_loci.py' < '%s' > '%s' 2>'%s'",
     genoscores_host, genoscores_host, json_alpha_in, json_alpha_out, json_alpha_err))
 if (file.exists(json_alpha_err) && file.size(json_alpha_err)>0L)
     message(paste(readLines(json_alpha_err, warn=FALSE), collapse="\n"))
@@ -157,7 +157,7 @@ write_json(diabepi_job, json_d_in, auto_unbox=TRUE, digits=8)
 on.exit(unlink(c(json_d_in, json_d_out, json_d_err)), add=TRUE)
 
 ret <- system(sprintf(
-    "scp -q run_gwas_loci.R '%s':~/ && scp -q '%s' '%s':~/snp_job.json && ssh '%s' 'Rscript ~/run_gwas_loci.R ~/snp_job.json' > '%s' 2>'%s'",
+    "scp -q diabepi_gwas_loci.R '%s':~/ && scp -q '%s' '%s':~/snp_job.json && ssh '%s' 'Rscript ~/diabepi_gwas_loci.R ~/snp_job.json' > '%s' 2>'%s'",
     diabepi_host, json_d_in, diabepi_host, diabepi_host, json_d_out, json_d_err))
 if (file.exists(json_d_err) && file.size(json_d_err)>0L)
     message(paste(readLines(json_d_err, warn=FALSE), collapse="\n"))
@@ -214,7 +214,7 @@ write_json(gamma_job, json_g_in, auto_unbox=TRUE, digits=8)
 on.exit(unlink(c(json_g_in, json_g_out, json_g_err)), add=TRUE)
 
 ret <- system(sprintf(
-    "ssh '%s' 'python3 ~/run_zarr_loci.py' < '%s' > '%s' 2>'%s'",
+    "ssh '%s' 'python3 ~/genoscores_zarr_loci.py' < '%s' > '%s' 2>'%s'",
     genoscores_host, json_g_in, json_g_out, json_g_err))
 if (file.exists(json_g_err) && file.size(json_g_err)>0L)
     message(paste(readLines(json_g_err, warn=FALSE), collapse="\n"))

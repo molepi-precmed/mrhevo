@@ -4,7 +4,7 @@
 ## and per-SNP T1D z-scores from individual-level SDRNT1BIO/GS logistic regression.
 ##
 ## z-scores source: z_scores_gs.rds, computed by compute_gamma_indiv.R via
-##   run_gwas_loci.R on diabepi (individual-level genotypes, aligned to bim_a1).
+##   diabepi_gwas_loci.R on diabepi (individual-level genotypes, aligned to bim_a1).
 ## LD source: UKBB EUR zarr store on genoscores (362k samples, GRCh37, 18M variants).
 ##   SNP matching by rsid (build-agnostic); zarr LD accessed via SSH.
 ## Locus definition: Zhou et al. procedure — hits at p < 1e-6, candidates
@@ -14,7 +14,7 @@
 ##
 ## Bim used for: (1) (chr, pos hg38) -> rsid for PDCD1 SNPs;
 ##               (2) a1/a2 for allele alignment of PDCD1 to bim_a1.
-##               Bim_a1 re-alignment to zarr LD A1 is handled in run_zarr_loci.py.
+##               Bim_a1 re-alignment to zarr LD A1 is handled in genoscores_zarr_loci.py.
 
 library(data.table)
 library(jsonlite)
@@ -190,12 +190,12 @@ on.exit({ unlink(c(json_in, json_err, json_out)) }, add = TRUE)
 
 message(sprintf("Sending %d loci to genoscores via SSH...", length(job$loci)))
 ret <- system(sprintf(
-    "scp -q run_zarr_loci.py '%s':~/ && ssh '%s' 'python3 ~/run_zarr_loci.py' < '%s' > '%s' 2>'%s'",
+    "scp -q genoscores_zarr_loci.py '%s':~/ && ssh '%s' 'python3 ~/genoscores_zarr_loci.py' < '%s' > '%s' 2>'%s'",
     genoscores_host, genoscores_host, json_in, json_out, json_err
 ))
 if (file.exists(json_err) && file.size(json_err) > 0L)
     message(paste(readLines(json_err, warn = FALSE), collapse = "\n"))
-if (ret != 0L) stop("run_zarr_loci.py failed on genoscores (exit ", ret, ")")
+if (ret != 0L) stop("genoscores_zarr_loci.py failed on genoscores (exit ", ret, ")")
 checkpoint("after_loci")
 
 response <- read_json(json_out, simplifyVector = FALSE)$loci

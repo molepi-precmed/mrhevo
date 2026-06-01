@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
-## run_gwas_loci.R
-## Runs on diabepi. Reads JSON from stdin, writes JSON to stdout.
+## diabepi_gwas_loci.R
+## Runs on diabepi; master copy kept locally under git.
+## Reads JSON from stdin, writes JSON to stdout.
 ##
 ## Input JSON:
 ##   { "loci": [{ "locus_id": "chr2_locus1", "chr": 2,
@@ -73,7 +74,7 @@ bim_col_idx <- setNames(seq_len(nrow(bim)), bim$rsid)
 
 ## ---- Process loci ----
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 1L) stop("Usage: Rscript run_gwas_loci.R <input.json>")
+if (length(args) < 1L) stop("Usage: Rscript diabepi_gwas_loci.R <input.json>")
 job <- fromJSON(args[1L], simplifyVector = FALSE)
 message(sprintf("Processing %d loci...", length(job$loci)))
 

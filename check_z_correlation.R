@@ -101,11 +101,11 @@ write_json(snp_job, json_snp, auto_unbox=TRUE, digits=8)
 on.exit(unlink(c(json_snp, json_z, json_zerr)), add=TRUE)
 
 ret <- system(sprintf(
-    "scp -q run_gwas_loci.R '%s':~/ && scp -q '%s' '%s':~/snp_job.json && ssh '%s' 'Rscript ~/run_gwas_loci.R ~/snp_job.json' > '%s' 2>'%s'",
+    "scp -q diabepi_gwas_loci.R '%s':~/ && scp -q '%s' '%s':~/snp_job.json && ssh '%s' 'Rscript ~/diabepi_gwas_loci.R ~/snp_job.json' > '%s' 2>'%s'",
     diabepi_host, json_snp, diabepi_host, diabepi_host, json_z, json_zerr))
 if (file.exists(json_zerr) && file.size(json_zerr)>0L)
     message(paste(readLines(json_zerr, warn=FALSE), collapse="\n"))
-if (ret!=0L) stop("run_gwas_loci.R failed on diabepi (exit ", ret, ")")
+if (ret!=0L) stop("diabepi_gwas_loci.R failed on diabepi (exit ", ret, ")")
 
 z_response <- read_json(json_z, simplifyVector=FALSE)
 z_dt <- rbindlist(lapply(z_response$loci, function(l) {
@@ -120,7 +120,7 @@ message("Saved: z_scores_gs.rds")
 
 ## ---- Step 5: Merge and check allele coding ----
 ## Both z_IA and z_GS should be in the Allele1 (bim_a1) direction.
-## z_GS: explicitly aligned to Allele1 by run_gwas_loci.R.
+## z_GS: explicitly aligned to Allele1 by diabepi_gwas_loci.R.
 ## z_IA: allele direction from Iakovliev; no flip was applied in compute_gamma_ukb.R,
 ##       so z_IA is in whatever direction Iakovliev used.
 comp <- merge(z_dt, t1d[, .(rsid, z_IA)], by="rsid")
