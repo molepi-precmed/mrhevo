@@ -1,0 +1,226 @@
+---
+title: "GATE score coefficient from summary-level pQTL statistics"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: pdflatex
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(data.table)
+library(knitr)
+library(kableExtra)
+```
+
+# Background
+
+The **GATE** (Genetically Aided Trait Estimation) method constructs a
+composite genetic score for an exposure by summing the genetically predicted
+exposure values over all trans-pQTLs, then tests this GATE score for
+association with a disease outcome.
+This document derives a formula that computes the log-OR per SD of the GATE
+score---and its standard error---directly from the per-locus summary
+statistics $(\hat\alpha_k, \hat\gamma_k, \mathrm{SE}(\hat\gamma_k),
+\mathrm{sd}_{Z,k})$ that are already available from the MR-Hevo pipeline,
+without requiring access to individual-level data.
+
+# Notation
+
+| Symbol | Meaning |
+|--------|---------|
+| $k$ | Trans-pQTL locus index; $k = 1,\ldots,K$ |
+| $j$ | SNP index within locus $k$ |
+| $G_{ij}$ | Genotype (0/1/2 copies of effect allele) for individual $i$, SNP $j$ |
+| $\hat\beta_{m,kj}$ | Per-allele instrument weight for SNP $j$ in locus $k$ (from UKBB zarr LD) |
+| $Z_{ik} = \sum_j G_{ij}\hat\beta_{m,kj}$ | Scalar instrument score for individual $i$ at locus $k$ |
+| $\hat\alpha_k$ | Instrument-exposure coefficient: $E[\Delta X \mid \Delta Z_k = 1]$ |
+| $\hat\gamma_k$ | Instrument-outcome coefficient: $E[\Delta \log\mathrm{OR}(Y) \mid \Delta Z_k = 1]$ |
+| $\mathrm{SE}(\hat\gamma_k)$ | Standard error of $\hat\gamma_k$ (from LD-approximate formula) |
+| $\mathrm{sd}_{Z,k}$ | SD of $Z_k$ in the UKBB reference panel (stored as \texttt{sd.Z}) |
+| $N, p$ | Total sample size and case fraction in the target dataset |
+
+# The GATE score
+
+The GATE score for individual $i$, summed over all trans-pQTLs, is
+$$
+G_i = \sum_{k=1}^K \hat\alpha_k\, Z_{ik},
+$$
+where the cis-pQTL is excluded.
+Trans-pQTL loci are in distinct genomic regions and are therefore
+approximately uncorrelated, so
+$$
+\mathrm{Var}_{\mathrm{ref}}(G) = \sum_k \hat\alpha_k^2\, \mathrm{sd}_{Z,k}^2
+$$
+with no cross-terms.  The standardised GATE score is
+$$
+G_i^* = G_i \,/\, \mathrm{SD}_\mathrm{ref}(G).
+$$
+
+# Score test for $\hat\beta_\mathrm{GATE}$
+
+## Score and information
+
+Let $Y_i \in \{0,1\}$ denote disease status and let $\hat\mu_i^{(0)}$
+denote the fitted probability under the null logistic model (intercept +
+covariates, no genetic term).  Define
+$$
+r_i = Y_i - \hat\mu_i^{(0)}, \qquad
+w_i = \hat\mu_i^{(0)}(1-\hat\mu_i^{(0)}).
+$$
+The score and partial Fisher information for a scalar instrument $X$ are
+$$
+U_X = \mathbf{x}^\top \mathbf{r}, \qquad
+V_X = \mathbf{x}^\top \mathbf{W} \mathbf{x}
+     - \mathbf{x}^\top \mathbf{W} \mathbf{Z}
+       (\mathbf{Z}^\top \mathbf{W} \mathbf{Z})^{-1}
+       \mathbf{Z}^\top \mathbf{W} \mathbf{x},
+$$
+where $\mathbf{Z}$ is the null-model design matrix (intercept + covariates)
+and $\mathbf{W} = \mathrm{diag}(w_i)$.
+The score estimate is $\hat\beta = U_X / V_X$ with
+$\mathrm{SE}(\hat\beta) = 1/\sqrt{V_X}$.
+
+Since the null model includes an intercept and all covariates, the
+per-locus score $U_k = \mathbf{z}_k^\top \mathbf{r}$ already adjusts for
+their correlations with $Z_k$.
+
+## Combining over trans-pQTLs
+
+For the standardised composite $G^* = G / \mathrm{SD}_G =
+(\sum_k \hat\alpha_k Z_k) / \mathrm{SD}_G$:
+$$
+U_{G^*} = \frac{1}{\mathrm{SD}_G} \sum_k \hat\alpha_k\, U_k, \qquad
+V_{G^*} = \frac{1}{\mathrm{SD}_G^2} \sum_k \hat\alpha_k^2\, V_k,
+$$
+using the independence of instruments across loci ($U_k \perp U_l$,
+$V_k \perp V_l$ for $k \neq l$).
+
+The score estimate is
+$$
+\hat\beta_\mathrm{GATE}
+= \frac{U_{G^*}}{V_{G^*}}
+= \mathrm{SD}_G \cdot
+  \frac{\displaystyle\sum_k \hat\alpha_k\, U_k}
+       {\displaystyle\sum_k \hat\alpha_k^2\, V_k}.
+$$
+Substituting $U_k = \hat\gamma_k V_k$ (the score estimate for locus $k$):
+
+$$
+\boxed{
+\hat\beta_\mathrm{GATE}
+= \mathrm{SD}_G \cdot
+  \frac{\displaystyle\sum_k \hat\alpha_k\, \hat\gamma_k\, /\, \mathrm{SE}(\hat\gamma_k)^2}
+       {\displaystyle\sum_k \hat\alpha_k^2\, /\, \mathrm{SE}(\hat\gamma_k)^2}
+}
+\label{eq:beta}
+$$
+
+$$
+\boxed{
+\mathrm{SE}(\hat\beta_\mathrm{GATE})
+= \frac{\mathrm{SD}_G}
+       {\sqrt{\displaystyle\sum_k \hat\alpha_k^2\, /\, \mathrm{SE}(\hat\gamma_k)^2}}
+}
+\label{eq:se}
+$$
+
+# Simplification of the standard error
+
+The LD-approximate SE formula used by the pipeline (see \texttt{genoscores\_zarr\_loci.py}) is
+$$
+\mathrm{SE}(\hat\gamma_k) = \frac{1}{\sqrt{N\, \mathrm{sd}_{Z,k}^2\, p(1-p)}},
+\qquad \text{so} \quad
+V_k = \frac{1}{\mathrm{SE}(\hat\gamma_k)^2} = N\,\mathrm{sd}_{Z,k}^2\, p(1-p).
+$$
+Substituting into the denominator of \eqref{eq:se}:
+$$
+\sum_k \hat\alpha_k^2\, V_k
+= N\, p(1-p) \sum_k \hat\alpha_k^2\, \mathrm{sd}_{Z,k}^2
+= N\, p(1-p)\, \mathrm{SD}_G^2.
+$$
+Therefore
+$$
+\mathrm{SE}(\hat\beta_\mathrm{GATE})
+= \frac{\mathrm{SD}_G}{\sqrt{N\, p(1-p)}\, \mathrm{SD}_G}
+= \frac{1}{\sqrt{N\, p(1-p)}}.
+$$
+The SE is determined entirely by the sample size and case fraction, and is
+equal to the SE that would be obtained from a single 1-df binary logistic
+regression.
+
+# Equivalence to the IVW z-statistic
+
+Substituting $V_k = N\,\mathrm{sd}_{Z,k}^2\,p(1-p)$ into the numerator and
+defining the per-SD(Z) quantities
+$\hat\alpha_k^* = \hat\alpha_k\,\mathrm{sd}_{Z,k}$ and
+$\hat\gamma_k^* = \hat\gamma_k\,\mathrm{sd}_{Z,k}$ (the values displayed in
+the instrument tables), the z-statistic becomes
+$$
+z_\mathrm{GATE}
+= \frac{\hat\beta_\mathrm{GATE}}{\mathrm{SE}(\hat\beta_\mathrm{GATE})}
+= \sqrt{N p(1-p)}\cdot
+  \frac{\sum_k (\hat\alpha_k^*)^2\, \hat\theta_k}
+       {\sqrt{\sum_k (\hat\alpha_k^*)^2}},
+$$
+where $\hat\theta_k = \hat\gamma_k^* / \hat\alpha_k^*$ is the per-locus
+IV-ratio estimate.  This is the IVW z-statistic with weights
+$w_k = (\hat\alpha_k^*)^2$ proportional to the reciprocal variance of the
+ratio estimator---identical to the MR-Hevo IVW estimator restricted to
+trans-pQTLs.
+
+# Comparison: summary-level vs direct regression (PDCD1/T1D)
+
+The summary-level formula is validated against the directly computed
+coefficient from logistic regression of T1D on the individual-level GATE
+score in the SDRNT1BIO/GS dataset (4,922 cases, 7,452 controls).
+For the direct computation, the GATE score is accumulated as
+$G_i = \sum_{k,j} G_{ij} \cdot (\hat\alpha_k \hat\beta_{m,kj})$ across all
+trans-pQTL SNPs in the individual-level genotype data on \texttt{diabepi}.
+
+The two methods differ in the SD used for standardisation: the summary-level
+formula uses $\mathrm{SD}_\mathrm{ref}(G)$ from the UKBB reference panel,
+while the direct regression standardises by the empirical SD in the target
+GS dataset.  The z-statistics are invariant to this scaling difference;
+the ratio $\hat\beta_\mathrm{summary}/\hat\beta_\mathrm{direct}$ estimates
+$\mathrm{SD}_\mathrm{ref}(G) / \mathrm{SD}_\mathrm{target}(G)$ and should
+be close to 1 for a well-calibrated reference panel.
+
+```{r comparison-table, results='asis'}
+if (file.exists("gate_results.rds")) {
+    res <- readRDS("gate_results.rds")
+    tab <- data.frame(
+        Method              = c("Summary-level", "Direct (individual-level)"),
+        `$\\hat\\beta$`     = sprintf("%.4f", res$beta_GATE),
+        SE                  = sprintf("%.5f", res$se_GATE),
+        z                   = sprintf("%.3f",  res$z_GATE),
+        p                   = formatC(res$p_value, format="g", digits=3),
+        `Trans pQTLs`       = as.integer(res$n_trans_pqtl),
+        check.names = FALSE
+    )
+    kable(tab, format="latex", booktabs=TRUE, escape=FALSE,
+          caption=paste0(
+              "GATE coefficient for T1D ($\\hat\\beta_\\mathrm{GATE}$ = log-OR per SD of GATE score) ",
+              "from summary-level formula vs direct individual-level regression. ",
+              "Trans-pQTLs: number of pQTL loci contributing to the GATE score ",
+              "(cis-pQTL PDCD1 excluded). ",
+              "SE (summary-level) $= 1/\\sqrt{Np(1-p)} \\approx 0.0090$; ",
+              "SE (direct) uses the empirical SD of the GATE score in the GS target dataset."),
+          label="gate-comparison") |>
+        kable_styling(latex_options="hold_position")
+} else {
+    cat("\\textit{Run \\texttt{compute\\_gate.R} to generate \\texttt{gate\\_results.rds}.}\n")
+}
+```
+
+The z-statistics from both methods should agree closely.
+Any discrepancy reflects LD mismatch between the UKBB reference panel and
+the GS target dataset, analogous to the attenuation seen in the
+LD-approximate $\hat\gamma$ estimates (Pearson $r \approx 0.83$ in the
+Analysis~2 vs Analysis~3 comparison in the main report).
