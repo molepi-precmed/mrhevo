@@ -344,11 +344,11 @@ plot_iv_estimates(
                       round(ivw_indiv_trans$Estimate, 3),
                       "  (SE ", round(ivw_indiv_trans$SE, 3),
                       ", p = ", ivw_indiv_trans$pvalue.formatted, ")")
-)
+) + theme(axis.title = element_text(size = 7))
 ```
 
 \vspace{-0.5em}
-\footnotesize Red point: PDCD1 cis-pQTL. Red dashed line: IVW slope (trans only).
+\scriptsize Red point: PDCD1 cis-pQTL. Red dashed line: IVW slope (trans only).
 
 ## Analyses 2 and 3: UKBB 18M EUR LD
 
