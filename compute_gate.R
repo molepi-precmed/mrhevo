@@ -171,17 +171,10 @@ weights_by_locus <- setNames(
     sapply(alpha_resp, `[[`, "locus_id"))
 message(sprintf("  Received alpha + weights for %d loci", nrow(alpha_info)))
 
-## Exclude cis-pQTL from GATE sum
-cis_locus_b <- alpha_info[
-    locus_id %like% "^chr2_",
-    locus_id[which.min(abs(
-        stats[locus_id %in% locus_id, .(lo=min(pos)), by=locus_id]$lo - pdcd1_mid
-    ))]
-]
-## simpler: use the same cis_locus identified from the .rds files
-trans_loci_b <- alpha_info[!locus_id %in% cis_locus, locus_id]
-message(sprintf("  %d trans-pQTL loci for GATE (excluding %s)",
-                length(trans_loci_b), cis_locus))
+## Restrict to exactly the same trans-pQTL loci used in Part A (summary-level)
+trans_loci_b <- alpha_info[locus_id %in% tr$qtlname, locus_id]
+message(sprintf("  %d trans-pQTL loci for GATE (same set as summary-level)",
+                length(trans_loci_b)))
 
 ## Build combined GATE SNP list: weight_{kj} = alpha_hat_k * beta_m_kj
 gate_snps <- rbindlist(lapply(trans_loci_b, function(lid) {
