@@ -14,6 +14,7 @@ header-includes:
   - \usepackage{booktabs}
   - \setbeamertemplate{navigation symbols}{}
   - \setbeamerfont{frametitle}{size=\normalsize}
+  - \setbeamertemplate{footline}{}
 ---
 
 ```{r setup, include=FALSE}
@@ -85,6 +86,7 @@ coeffs_ukb <- make_coeffs("alpha_pdcd1_UKB.rds","gamma_t1d_ukb.rds","locus_genes
 cis_ukb    <- find_cis(coeffs_ukb)
 ivw_ukb_trans <- get_estimatorsMR(coeffs_ukb[qtlname != cis_ukb])
 ivw_ukb_trans[, pvalue.formatted := format.z.aspvalue(Estimate/SE)]
+ivw_ukb_trans[, pvalue.plain := formatC(2*pnorm(-abs(Estimate/SE)), format="g", digits=2)]
 apply_overrides(coeffs_ukb)
 
 indiv_raw <- fread("pdcd1.mr.coeffs.csv")
@@ -98,6 +100,7 @@ indiv_dt <- get_coeffratios(indiv_raw, use.delta=TRUE)
 cis_indiv <- indiv_dt[qtl_type=="cis-x", scoreid]
 ivw_indiv_trans <- get_estimatorsMR(indiv_dt[!(scoreid %in% cis_indiv)])
 ivw_indiv_trans[, pvalue.formatted := format.z.aspvalue(Estimate/SE)]
+ivw_indiv_trans[, pvalue.plain := formatC(2*pnorm(-abs(Estimate/SE)), format="g", digits=2)]
 apply_overrides(indiv_dt)
 
 comp_direct <- readRDS("gamma_comparison_analytic_vs_direct.rds")
@@ -123,6 +126,7 @@ ivw_direct_trans <- d_sc[!is_cis_direct,
                           .(Estimate=sum(theta_IV*inv.var)/sum(inv.var),
                             SE=sqrt(1/sum(inv.var)))]
 ivw_direct_trans[, pvalue.formatted := format.z.aspvalue(Estimate/SE)]
+ivw_direct_trans[, pvalue.plain := formatC(2*pnorm(-abs(Estimate/SE)), format="g", digits=2)]
 
 gate_res <- if (file.exists("gate_results.rds")) readRDS("gate_results.rds") else NULL
 ```
@@ -343,7 +347,7 @@ plot_iv_estimates(
     subtitle = paste0("IVW (trans only): θ̂ = ",
                       round(ivw_indiv_trans$Estimate, 3),
                       "  (SE ", round(ivw_indiv_trans$SE, 3),
-                      ", p = ", ivw_indiv_trans$pvalue.formatted, ")")
+                      ", p = ", ivw_indiv_trans$pvalue.plain, ")")
 ) + theme(axis.title = element_text(size = 7))
 ```
 
@@ -365,7 +369,7 @@ plot_iv_estimates(
     highlight    = is_cis_direct
 ) + labs(title="Analysis 2: direct γ̂",
          subtitle=paste0("θ̂ = ", round(ivw_direct_trans$Estimate,3),
-                         "  (p = ", ivw_direct_trans$pvalue.formatted, ")"))
+                         "  (p = ", ivw_direct_trans$pvalue.plain, ")"))
 ```
 ::::
 :::: {.column width="50%"}
@@ -381,7 +385,7 @@ plot_iv_estimates(
     highlight    = coeffs_ukb$qtlname == cis_ukb
 ) + labs(title="Analysis 3: LD-approx γ̂",
          subtitle=paste0("θ̂ = ", round(ivw_ukb_trans$Estimate,3),
-                         "  (p = ", ivw_ukb_trans$pvalue.formatted, ")"))
+                         "  (p = ", ivw_ukb_trans$pvalue.plain, ")"))
 ```
 ::::
 :::
