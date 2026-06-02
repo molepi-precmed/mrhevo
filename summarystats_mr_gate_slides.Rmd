@@ -473,8 +473,6 @@ ggplot(comp_direct, aes(x=gamma_direct, y=gamma_analytic_sdz)) +
 
 ## GATE score: summary-level vs direct regression
 
-\footnotesize
-
 ```{r slide-gate, results='asis'}
 if (!is.null(gate_res)) {
     tab <- data.frame(
@@ -488,11 +486,11 @@ if (!is.null(gate_res)) {
     )
     kable(tab, format="latex", booktabs=TRUE, escape=FALSE,
           col.names=c("Method","$\\hat\\beta$","SE","$z$","$p$","Trans pQTLs")) |>
-        kable_styling(font_size=9, latex_options="hold_position")
+        kable_styling(font_size=7, latex_options="hold_position")
 }
 ```
 
-\medskip
+\fontsize{7}{9}\selectfont
 
 - Both methods: **strongly positive effect of PDCD1 on T1D**
 - $z_\text{direct} = `r if(!is.null(gate_res)) round(gate_res[method=="direct", z_GATE], 1)`$,
