@@ -370,7 +370,8 @@ plot_iv_estimates(
 ) + labs(title="Analysis 2: direct γ̂",
          subtitle=paste0("θ̂ = ", round(ivw_direct_trans$Estimate,3),
                          "  (p = ", ivw_direct_trans$pvalue.plain, ")")) +
-    theme(axis.title = element_text(size = 7))
+    theme(axis.title = element_text(size = 7),
+          axis.text  = element_text(size = 6))
 ```
 ::::
 :::: {.column width="50%"}
@@ -408,12 +409,15 @@ alpha_comp <- foverlaps(dt_indiv, dt_ukb, nomatch=0L)
 slope_ols  <- coef(lm(alpha_ukb ~ 0 + alpha_indiv, data=alpha_comp))["alpha_indiv"]
 alpha_comp[, resid_id := alpha_ukb - alpha_indiv]
 alpha_comp[, lab := ifelse(abs(resid_id) > 2*sd(resid_id, na.rm=TRUE), gene, "")]
+ax_breaks <- pretty(c(0, max(alpha_comp$alpha_indiv, alpha_comp$alpha_ukb, na.rm=TRUE)))
 
 ggplot(alpha_comp, aes(x=alpha_indiv, y=alpha_ukb)) +
     geom_abline(slope=1,         intercept=0, linetype="dashed", colour="grey50") +
     geom_abline(slope=slope_ols, intercept=0, linetype="dotted", colour="blue") +
     geom_point(size=1.5) +
     geom_text_repel(aes(label=lab), size=2.5, max.overlaps=Inf) +
+    scale_x_continuous(breaks=ax_breaks, limits=range(ax_breaks)) +
+    scale_y_continuous(breaks=ax_breaks, limits=range(ax_breaks)) +
     labs(x=expression(hat(alpha)["Analysis 1, 1000G"]),
          y=expression(hat(alpha)["Analyses 2/3, UKBB 18M"]),
          title="Instrument-exposure coefficients: 1000G vs UKBB LD") +
