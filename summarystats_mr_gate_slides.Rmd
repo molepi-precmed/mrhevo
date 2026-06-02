@@ -140,9 +140,8 @@ gate_res <- if (file.exists("gate_results.rds")) readRDS("gate_results.rds") els
 \medskip
 
 - SNPs near each other are correlated — *linkage disequilibrium* (LD)
-- A univariate (marginal) coefficient absorbs effects from its neighbours
-- For Mendelian randomization we need the *direct* effect of each SNP: the
-  multivariate (joint) regression coefficient
+- Conventional Mendelian randomization uses only a single exposure-associated SNP in each region
+- We want to use all exposure associated SNPs in each region to construct one scalar instrument for each region: for this we need multivariate (joint) regression coefficients
 
 \medskip
 
@@ -152,7 +151,7 @@ gate_res <- if (file.exists("gate_results.rds")) readRDS("gate_results.rds") els
 $\Rightarrow$ Can we recover multivariate coefficients from summary statistics alone,
 using a reference panel for LD?
 
-## Recovering multivariate coefficients via LD inversion
+## Recovering multivariate coefficients via LD matrix inversion
 
 Let $\hat{\boldsymbol\beta}_u$ be the vector of univariate (marginal) per-SNP
 coefficients and $\mathbf{C}_g$ the LD correlation matrix from a reference panel.
@@ -248,13 +247,13 @@ $$
 
 ## GATE score: pooling instruments across loci
 
-**GATE** (Genomewide Aggregated Trans- Effects) combines all *trans*-pQTL
+**GATE** (Genomewide Aggregated _Trans_- Effects) combines all *trans*-pQTL
 instruments into a single composite genetic score:
 $$
 G_i = \sum_{k\,\in\,\text{trans}} \hat\alpha_k\,Z_{ik}
 $$
 
-- Each trans-pQTL $k$ contributes its genetically predicted exposure value
+- Each _trans_-pQTL $k$ contributes its genetically predicted exposure value
 - Standardise to SD = 1, then regress disease on $G^*$
 - Tests whether the *overall* genetic evidence supports a causal effect
 
@@ -349,7 +348,7 @@ plot_iv_estimates(
     qtlname      = qtl_lab,
     highlight    = indiv_dt$scoreid %in% cis_indiv
 ) + labs(
-    title = paste0("Analysis 1 — 1000G LD  |  ",
+    title = paste0("Analysis 1 — LD from 1000G LD  |  ",
                    nrow(indiv_dt), " instruments"),
     subtitle = paste0("IVW (trans only): θ̂ = ",
                       round(ivw_indiv_trans$Estimate, 3),
@@ -361,18 +360,24 @@ plot_iv_estimates(
 \vspace{-0.5em}
 \scriptsize Red point: PDCD1 cis-pQTL. Red dashed line: IVW slope (trans only).
 
-## Analyses 2 and 3: UKBB 18M EUR LD
+## Analyses 2 and 3: LD matrix from UKBB 18M EUR
 
 ::: columns
 :::: {.column width="50%"}
 ```{r slide-direct, fig.width=2.4, fig.height=2.4}
+resid_d  <- abs(d_sc$gamma_direct - ivw_direct_trans$Estimate * d_sc$alpha_hat * d_sc$sd.Z)
+top5_d   <- order(resid_d, decreasing=TRUE)[seq_len(min(5L, nrow(d_sc)))]
+lab_d    <- rep("", nrow(d_sc))
+lab_d[top5_d] <- sub(",.*$", "", d_sc$gene[top5_d])
+lab_d[is_cis_direct] <- sub(",.*$", "", d_sc$gene[is_cis_direct])
+
 plot_iv_estimates(
     alpha_hat    = d_sc$alpha_hat    * d_sc$sd.Z,
     se.alpha_hat = d_sc$se.alpha_hat * d_sc$sd.Z,
     gamma_hat    = d_sc$gamma_direct,
     se.gamma_hat = d_sc$se_gamma_direct,
     theta        = ivw_direct_trans$Estimate,
-    qtlname      = sub(",.*$","", d_sc$gene),
+    qtlname      = lab_d,
     highlight    = is_cis_direct
 ) + labs(title="Analysis 2: direct γ̂",
          subtitle=paste0("θ̂ = ", round(ivw_direct_trans$Estimate,3),
@@ -384,18 +389,25 @@ plot_iv_estimates(
 :::: {.column width="50%"}
 ```{r slide-ukb, fig.width=2.4, fig.height=2.4}
 sdz <- coeffs_ukb$sd.Z
+resid_u  <- abs(coeffs_ukb$gamma_hat * sdz - ivw_ukb_trans$Estimate * coeffs_ukb$alpha_hat * sdz)
+top5_u   <- order(resid_u, decreasing=TRUE)[seq_len(min(5L, nrow(coeffs_ukb)))]
+lab_u    <- rep("", nrow(coeffs_ukb))
+lab_u[top5_u] <- sub(",.*$", "", coeffs_ukb$gene[top5_u])
+lab_u[coeffs_ukb$qtlname == cis_ukb] <- sub(",.*$", "", coeffs_ukb$gene[coeffs_ukb$qtlname == cis_ukb])
+
 plot_iv_estimates(
     alpha_hat    = coeffs_ukb$alpha_hat    * sdz,
     se.alpha_hat = coeffs_ukb$se.alpha_hat * sdz,
     gamma_hat    = coeffs_ukb$gamma_hat    * sdz,
     se.gamma_hat = coeffs_ukb$se.gamma_hat * sdz,
     theta        = ivw_ukb_trans$Estimate,
-    qtlname      = sub(",.*$","", coeffs_ukb$gene),
+    qtlname      = lab_u,
     highlight    = coeffs_ukb$qtlname == cis_ukb
 ) + labs(title="Analysis 3: LD-approx γ̂",
          subtitle=paste0("θ̂ = ", round(ivw_ukb_trans$Estimate,3),
                          "  (p = ", ivw_ukb_trans$pvalue.plain, ")")) +
-    theme(axis.title = element_text(size = 7))
+    theme(axis.title = element_text(size = 7),
+          axis.text  = element_text(size = 6))
 ```
 ::::
 :::
@@ -460,6 +472,8 @@ ggplot(comp_direct, aes(x=gamma_direct, y=gamma_analytic_sdz)) +
 \footnotesize Pearson $r = `r round(r_ad, 3)`$. Attenuation reflects LD mismatch between UKBB reference and GS target.
 
 ## GATE score: summary-level vs direct regression
+
+\small
 
 ```{r slide-gate, results='asis'}
 if (!is.null(gate_res)) {
