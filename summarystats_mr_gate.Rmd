@@ -221,33 +221,6 @@ z_\mathrm{GATE}
 \tag{9}
 $$
 
-## Comparison: summary-level vs direct regression (PDCD1/T1D)
-
-```{r gate-comparison-table, results='asis'}
-if (file.exists("gate_results.rds")) {
-    res <- readRDS("gate_results.rds")
-    tab <- data.frame(
-        Method          = c("Summary-level", "Direct (individual-level)"),
-        `$\\hat\\beta$` = sprintf("%.4f", res$beta_GATE),
-        SE              = sprintf("%.5f", res$se_GATE),
-        z               = sprintf("%.3f",  res$z_GATE),
-        p               = formatC(res$p_value, format="g", digits=3),
-        `Trans pQTLs`   = as.integer(res$n_trans_pqtl),
-        check.names = FALSE
-    )
-    kable(tab, format="latex", booktabs=TRUE, escape=FALSE,
-          caption=paste0(
-              "GATE coefficient for T1D ($\\hat\\beta_\\mathrm{GATE}$ = log-OR per SD of GATE score) ",
-              "from summary-level formula (eq.\\ 7) vs direct individual-level regression. ",
-              "Trans-pQTLs: loci contributing to the GATE score (PDCD1 cis-pQTL excluded). ",
-              "SE (summary-level) $= 1/\\sqrt{Np(1-p)} \\approx 0.0184$ (eq.\\ 8)."),
-          label="gate-comparison") |>
-        kable_styling(latex_options="hold_position")
-} else {
-    cat("\\textit{Run \\texttt{compute\\_gate.R} to generate \\texttt{gate\\_results.rds}.}\n")
-}
-```
-
 \cleardoublepage
 
 \part{PDCD1/T1D MR-Hevo analysis}
@@ -714,5 +687,46 @@ if (!file.exists("mrhevo_pdcd1_t1d_fit.rds")) {
     cat("\\textit{MR-Hevo posterior results not yet available.",
         "Run \\texttt{run\\_mrhevo\\_pdcd1\\_t1d.R} to generate",
         "\\texttt{mrhevo\\_pdcd1\\_t1d\\_fit.rds}.}\n")
+}
+```
+
+# GATE score: summary-level vs direct regression (PDCD1/T1D)
+
+The summary-level GATE coefficient (eq.\ 7) is compared with the directly computed
+coefficient from logistic regression of T1D on the individual-level GATE score in
+the SDRNT1BIO/GS dataset (4,922 cases, 7,452 controls).
+For the direct computation, the GATE score is accumulated as
+$G_i = \sum_{k,j} G_{ij} \cdot (\hat\alpha_k \hat\beta_{m,kj})$ across all
+trans-pQTL SNPs in the individual-level genotype data.
+
+The two methods differ in the SD used for standardisation: the summary-level
+formula uses $\mathrm{SD}_\mathrm{ref}(G)$ from the UKBB reference panel,
+while the direct regression standardises by the empirical SD in the GS target
+dataset.  The z-statistics are invariant to this scaling; the ratio
+$\hat\beta_\mathrm{summary}/\hat\beta_\mathrm{direct}$ estimates
+$\mathrm{SD}_\mathrm{ref}(G)/\mathrm{SD}_\mathrm{target}(G)$.
+
+```{r gate-comparison-table, results='asis'}
+if (file.exists("gate_results.rds")) {
+    res <- readRDS("gate_results.rds")
+    tab <- data.frame(
+        Method          = c("Summary-level", "Direct (individual-level)"),
+        `$\\hat\\beta$` = sprintf("%.4f", res$beta_GATE),
+        SE              = sprintf("%.5f", res$se_GATE),
+        z               = sprintf("%.3f",  res$z_GATE),
+        p               = formatC(res$p_value, format="g", digits=3),
+        `Trans pQTLs`   = as.integer(res$n_trans_pqtl),
+        check.names = FALSE
+    )
+    kable(tab, format="latex", booktabs=TRUE, escape=FALSE,
+          caption=paste0(
+              "GATE coefficient for T1D ($\\hat\\beta_\\mathrm{GATE}$ = log-OR per SD of GATE score) ",
+              "from summary-level formula (eq.\\ 7) vs direct individual-level regression. ",
+              "Trans-pQTLs: loci contributing to the GATE score (PDCD1 cis-pQTL excluded). ",
+              "SE (summary-level) $= 1/\\sqrt{Np(1-p)} \\approx 0.0184$ (eq.\\ 8)."),
+          label="gate-comparison") |>
+        kable_styling(latex_options="hold_position")
+} else {
+    cat("\\textit{Run \\texttt{compute\\_gate.R} to generate \\texttt{gate\\_results.rds}.}\n")
 }
 ```
