@@ -358,7 +358,7 @@ plot_iv_estimates(
 
 ::: columns
 :::: {.column width="50%"}
-```{r slide-direct, fig.width=2.8, fig.height=2.8}
+```{r slide-direct, fig.width=2.4, fig.height=2.4}
 plot_iv_estimates(
     alpha_hat    = d_sc$alpha_hat    * d_sc$sd.Z,
     se.alpha_hat = d_sc$se.alpha_hat * d_sc$sd.Z,
@@ -369,11 +369,12 @@ plot_iv_estimates(
     highlight    = is_cis_direct
 ) + labs(title="Analysis 2: direct γ̂",
          subtitle=paste0("θ̂ = ", round(ivw_direct_trans$Estimate,3),
-                         "  (p = ", ivw_direct_trans$pvalue.plain, ")"))
+                         "  (p = ", ivw_direct_trans$pvalue.plain, ")")) +
+    theme(axis.title = element_text(size = 7))
 ```
 ::::
 :::: {.column width="50%"}
-```{r slide-ukb, fig.width=2.8, fig.height=2.8}
+```{r slide-ukb, fig.width=2.4, fig.height=2.4}
 sdz <- coeffs_ukb$sd.Z
 plot_iv_estimates(
     alpha_hat    = coeffs_ukb$alpha_hat    * sdz,
@@ -385,7 +386,8 @@ plot_iv_estimates(
     highlight    = coeffs_ukb$qtlname == cis_ukb
 ) + labs(title="Analysis 3: LD-approx γ̂",
          subtitle=paste0("θ̂ = ", round(ivw_ukb_trans$Estimate,3),
-                         "  (p = ", ivw_ukb_trans$pvalue.plain, ")"))
+                         "  (p = ", ivw_ukb_trans$pvalue.plain, ")")) +
+    theme(axis.title = element_text(size = 7))
 ```
 ::::
 :::
