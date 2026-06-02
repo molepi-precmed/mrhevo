@@ -175,21 +175,20 @@ locus_results <- lapply(job$loci, function(locus) {
 
         if (n_contrib > 0L && sd(Z_score) > 0) {
             Z_scaled <- Z_score / sd(Z_score)   # unit-SD instrument in target dataset
-            df_Z  <- data.frame(pheno = pheno_vec, Z = Z_scaled, cov_df)
-            fit_Z <- tryCatch(
-                glm(pheno ~ ., data = df_Z, family = binomial),
-                error   = function(e) NULL,
-                warning = function(w) suppressWarnings(
-                    glm(pheno ~ ., data = df_Z, family = binomial)))
-            if (!is.null(fit_Z)) {
-                cf <- tryCatch(coef(summary(fit_Z))["Z", ], error = function(e) NULL)
-                if (!is.null(cf)) {
-                    result$gamma_direct    <- as.numeric(cf["Estimate"])
-                    result$se_gamma_direct <- as.numeric(cf["Std. Error"])
-                    message(sprintf("  %s: gamma_direct = %.4f (SE %.4f)",
-                                    lid, result$gamma_direct, result$se_gamma_direct))
-                }
+
+            ## Score test (same partial-information correction as per-SNP code)
+            U_z    <- sum(Z_scaled * r_null)
+            V_raw_z <- sum(Z_scaled * Z_scaled * w_null)
+            ZtWz   <- crossprod(WZ_mat, Z_scaled)
+            c_vec_z <- forwardsolve(t(chol_ZtWZ), ZtWz)
+            V_z    <- V_raw_z - sum(c_vec_z * c_vec_z)
+            if (V_z > 0) {
+                result$gamma_direct    <- U_z / V_z
+                result$se_gamma_direct <- 1 / sqrt(V_z)
+                message(sprintf("  %s: gamma_direct = %.4f (SE %.4f) [score test]",
+                                lid, result$gamma_direct, result$se_gamma_direct))
             }
+
         }
     }
     result
