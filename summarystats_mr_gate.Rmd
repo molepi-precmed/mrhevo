@@ -165,7 +165,7 @@ computed from the reference panel.
 
 ## The GATE score
 
-The GATE (Genetically Aided Trait Estimation) score sums genetically predicted
+The GATE (Genomewide Aggregated Trans- Effects) score sums genetically predicted
 exposure values over all trans-pQTLs:
 $$
 G_i = \sum_{k \in \text{trans}} \hat\alpha_k\, Z_{ik},

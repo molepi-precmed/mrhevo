@@ -244,7 +244,7 @@ $$
 
 ## GATE score: pooling instruments across loci
 
-**GATE** (Genetically Aided Trait Estimation) combines all *trans*-pQTL
+**GATE** (Genomewide Aggregated Trans- Effects) combines all *trans*-pQTL
 instruments into a single composite genetic score:
 $$
 G_i = \sum_{k\,\in\,\text{trans}} \hat\alpha_k\,Z_{ik}
@@ -328,7 +328,7 @@ Analysis 3 & sumstats & sumstats \\
 
 ## Analysis 1 (Zhou et al.): $\hat\gamma$ vs $\hat\alpha$
 
-```{r slide-indiv, fig.width=5.5, fig.height=3.8}
+```{r slide-indiv, fig.width=4.8, fig.height=3.2}
 plot_iv_estimates(
     alpha_hat    = indiv_dt$alpha_hat,
     se.alpha_hat = indiv_dt$se.alpha_hat,
@@ -354,7 +354,7 @@ plot_iv_estimates(
 
 ::: columns
 :::: {.column width="50%"}
-```{r slide-direct, fig.width=3.2, fig.height=3.2}
+```{r slide-direct, fig.width=2.8, fig.height=2.8}
 plot_iv_estimates(
     alpha_hat    = d_sc$alpha_hat    * d_sc$sd.Z,
     se.alpha_hat = d_sc$se.alpha_hat * d_sc$sd.Z,
@@ -369,7 +369,7 @@ plot_iv_estimates(
 ```
 ::::
 :::: {.column width="50%"}
-```{r slide-ukb, fig.width=3.2, fig.height=3.2}
+```{r slide-ukb, fig.width=2.8, fig.height=2.8}
 sdz <- coeffs_ukb$sd.Z
 plot_iv_estimates(
     alpha_hat    = coeffs_ukb$alpha_hat    * sdz,

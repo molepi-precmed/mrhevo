@@ -461,7 +461,7 @@ without requiring individual-level data.
 
 # Background
 
-The **GATE** (Genetically Aided Trait Estimation) method constructs a
+The **GATE** (Genomewide Aggregated Trans- Effects) method constructs a
 composite genetic score for an exposure by summing the genetically predicted
 exposure values over all trans-pQTLs, then tests this GATE score for
 association with a disease outcome.
