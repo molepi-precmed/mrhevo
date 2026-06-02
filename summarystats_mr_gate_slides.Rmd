@@ -473,7 +473,7 @@ ggplot(comp_direct, aes(x=gamma_direct, y=gamma_analytic_sdz)) +
 
 ## GATE score: summary-level vs direct regression
 
-\small
+\footnotesize
 
 ```{r slide-gate, results='asis'}
 if (!is.null(gate_res)) {
