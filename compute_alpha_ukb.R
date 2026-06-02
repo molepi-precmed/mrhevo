@@ -23,13 +23,14 @@ tar_file       <- "pdcd1_stats/PDCD1_Q15116_OID21396_v1_Oncology.tar"
 bim_dir        <- "refpop/bim_by_chr"
 zarr_dir       <- "/opt/datastore/genome/LD_Eur_18mvariants/int8"
 genoscores_host <- "pmckeigue@genoscores.cphs.mvm.ed.ac.uk"
-gap_mb         <- 1.0
-window_mb      <- 1.0
-min_eig_frac   <- 0.01
-p_hit          <- 1e-6
-p_cand         <- 1e-5
-exclude_hla    <- TRUE
-info_threshold <- 0.3
+gap_mb            <- 1.0
+window_mb         <- 1.0
+min_eig_frac      <- 0.01
+p_hit             <- 1e-6
+p_cand            <- 1e-5
+exclude_hla       <- TRUE
+info_threshold    <- 0.3
+min_maf_threshold <- 0.01
 out_file       <- "alpha_pdcd1_UKB.rds"
 
 ## ---- Profiling helpers ----
@@ -88,6 +89,8 @@ n_before <- nrow(stats)
 stats <- stats[!is_ambiguous(Allele1, Allele2)]
 message(sprintf("  %d SNPs after dropping strand-ambiguous (%d dropped)",
                 nrow(stats), n_before - nrow(stats)))
+stats <- stats[pmin(Freq1, 1 - Freq1) >= min_maf_threshold]
+message(sprintf("  %d SNPs after MAF >= %.2f filter", nrow(stats), min_maf_threshold))
 checkpoint("after_filter")
 
 ## ---- Step 2: Define loci (Zhou et al. locus expansion) ----
@@ -128,6 +131,9 @@ stats[, locus_n   := cumsum(new_locus), by = chr]
 stats[, locus_id  := paste0("chr", chr, "_locus", locus_n)]
 stats[, c("prev_pos", "new_locus", "locus_n") := NULL]
 message(sprintf("  %d loci after bim matching", uniqueN(stats$locus_id)))
+
+## Minimum minor allele frequency per locus (from UKBB proteomics summary stats)
+locus_min_maf <- stats[, .(min_maf = min(pmin(Freq1, 1 - Freq1))), by = locus_id]
 
 ## Remap top_snps_ukb locus_id to post-match locus_id
 top_snps_ukb <- merge(top_snps_ukb,
@@ -195,6 +201,8 @@ alpha_dt <- rbindlist(lapply(response, function(r) data.table(
     sd.Z         = as.numeric(r$sd_Z)
 )))
 setorder(alpha_dt, chr, locus_start)
+alpha_dt <- merge(alpha_dt, locus_min_maf, by.x = "qtlname", by.y = "locus_id",
+                  all.x = TRUE)
 
 ## ---- Step 5: Report and save ----
 message(sprintf("\nCompleted: %d loci", nrow(alpha_dt)))

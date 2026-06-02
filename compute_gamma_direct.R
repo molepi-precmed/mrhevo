@@ -26,10 +26,10 @@ bim_dir         <- "refpop/bim_by_chr"
 zarr_dir        <- "/opt/datastore/genome/LD_Eur_18mvariants/int8"
 genoscores_host <- "pmckeigue@genoscores.cphs.mvm.ed.ac.uk"
 diabepi_host    <- "pmckeigue@diabepi.igmm.ed.ac.uk"
-gap_mb          <- 1.0;  window_mb     <- 1.0
-min_eig_frac    <- 0.01; p_hit         <- 1e-6
-p_cand          <- 1e-5; exclude_hla   <- TRUE
-info_threshold  <- 0.3
+gap_mb            <- 1.0;  window_mb     <- 1.0
+min_eig_frac      <- 0.01; p_hit         <- 1e-6
+p_cand            <- 1e-5; exclude_hla   <- TRUE
+info_threshold    <- 0.3;  min_maf_threshold <- 0.01
 N_cases         <- 4922L; N_ctrls <- 7452L
 N_gamma         <- N_cases + N_ctrls; p_case <- N_cases / N_gamma
 
@@ -56,6 +56,7 @@ stats <- stats[INFO >= info_threshold]; stats[, INFO := NULL]
 stats[, Pvalue := 10^(-log10p)]; stats[, log10p := NULL]
 is_ambig <- function(x,y) (x=="A"&y=="T")|(x=="T"&y=="A")|(x=="C"&y=="G")|(x=="G"&y=="C")
 stats <- stats[!is_ambig(Allele1, Allele2)]
+stats <- stats[pmin(Freq1, 1 - Freq1) >= min_maf_threshold]
 stats <- define_loci_expanded(stats, p_hit=p_hit, p_cand=p_cand,
                                window_mb=window_mb, gap_mb=gap_mb,
                                exclude_hla=exclude_hla)

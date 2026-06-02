@@ -68,7 +68,7 @@ find_cis <- function(dt) {
 make_coeffs <- function(alpha_rds, gamma_rds, genes_rds) {
     alpha_dt <- readRDS(alpha_rds)
     gamma_dt  <- readRDS(gamma_rds)
-    extra_cols <- intersect(c("sd.Z", "n_ld_blocks"), names(alpha_dt))
+    extra_cols <- intersect(c("sd.Z", "n_ld_blocks", "min_maf"), names(alpha_dt))
     alpha_sel  <- c("qtlname", "chr", "locus_start", "locus_end",
                     "n_snps", "eff_rank", "alpha_hat", "se.alpha_hat", extra_cols)
     dt <- merge(
@@ -224,20 +224,23 @@ make_table <- function(dt, label, caption_extra = "",
         base_cols[["SD($Z$)"]] <- round(dt$sd.Z, 3)
     if (has_ld_blocks)
         base_cols[["LD blks"]] <- dt$n_ld_blocks
+    if ("min_maf" %in% names(dt))
+        base_cols[["Min MAF"]] <- round(dt$min_maf, 2)
     base_cols[["$\\hat\\alpha$ (SE)"]] <- sprintf("%.4f (%.4f)", dt$alpha_hat * sdz, dt$se.alpha_hat * sdz)
     base_cols[["$\\hat\\gamma$ (SE)"]] <- sprintf("%.4f (%.4f)", dt$gamma_hat * sdz, dt$se.gamma_hat * sdz)
     base_cols[["*"]]                   <- ifelse(abs(dt$gamma_hat / dt$se.gamma_hat) > qnorm(0.995), "*", "")
     tab <- as.data.table(base_cols)
 
-    eff_rank_note  <- if (has_eff_rank)  "eff rank: effective rank of LD matrix. " else ""
-    sd_z_note      <- if (has_sd_z)      "SD($Z$): standard deviation of scalar instrument in reference panel. " else ""
-    ld_blocks_note <- if (has_ld_blocks) "LD blks: number of zarr LD blocks spanned by the locus. " else ""
+    eff_rank_note  <- if (has_eff_rank)             "eff rank: effective rank of LD matrix. " else ""
+    sd_z_note      <- if (has_sd_z)                 "SD($Z$): standard deviation of scalar instrument in reference panel. " else ""
+    ld_blocks_note <- if (has_ld_blocks)             "LD blks: number of zarr LD blocks spanned by the locus. " else ""
+    min_maf_note   <- if ("min_maf" %in% names(dt)) "Min MAF: minimum minor allele frequency across SNPs contributing to the locus (UKBB proteomics GWAS). " else ""
     k <- kable(tab, format = "latex", booktabs = TRUE, escape = FALSE,
           longtable = TRUE,
           caption = paste0(
               "Instrument coefficients", caption_extra, ". ",
               "Nearest Gene: protein-coding gene(s) nearest to or overlapping the locus. ",
-              "Num SNPs: SNPs in locus; ", eff_rank_note, sd_z_note, ld_blocks_note,
+              "Num SNPs: SNPs in locus; ", eff_rank_note, sd_z_note, ld_blocks_note, min_maf_note,
               "$\\hat\\alpha$ and $\\hat\\gamma$: instrument-exposure and ",
               "instrument-outcome coefficients per SD of the scalar instrument (SE in parentheses). ",
               "*: $|\\hat\\gamma / \\mathrm{SE}(\\hat\\gamma)| > 2.58$ ",
@@ -246,7 +249,12 @@ make_table <- function(dt, label, caption_extra = "",
           label = label) |>
         kable_styling(latex_options = c("repeat_header", "striped"),
                       font_size = if (small_font) 8 else NULL) |>
-        column_spec(1, width = "2.5cm")
+        column_spec(1, width = "2.5cm") |>
+        column_spec(3:5, width = "1.1cm")
+    col_n <- 6L
+    if (has_eff_rank) { k <- k |> column_spec(col_n, width = "1.1cm"); col_n <- col_n + 1L }
+    if (has_sd_z)      col_n <- col_n + 1L
+    if (has_ld_blocks) k <- k |> column_spec(col_n, width = "1.1cm")
     k
 }
 ```

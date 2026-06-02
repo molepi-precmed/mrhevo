@@ -72,6 +72,25 @@ message(sprintf("  Complete cases: %d cases, %d controls", N_cases, N_ctrls))
 ## ---- Build BIM rsid index ----
 bim_col_idx <- setNames(seq_len(nrow(bim)), bim$rsid)
 
+## ---- Fit null logistic model (covariates only) ----
+message("Fitting null logistic model (covariates only)...")
+null_df  <- data.frame(pheno = pheno_vec, cov_df)
+null_fit <- glm(pheno ~ ., data = null_df, family = binomial)
+mu_null  <- fitted(null_fit)
+r_null   <- pheno_vec - mu_null     # score residuals under null
+w_null   <- mu_null * (1 - mu_null) # Fisher information weights
+
+## Precompute Cholesky of Z'WZ for partial-information correction.
+## Without this, V = x'Wx overestimates information because it includes
+## the contribution of x's mean (captured by the intercept) and any
+## correlation of x with covariates; the corrected V removes these.
+Z_mat     <- model.matrix(null_fit)        # n × 6 (intercept + 5 covariates)
+WZ_mat    <- Z_mat * w_null                # n × 6, rows scaled by w_null
+ZtWZ      <- crossprod(WZ_mat, Z_mat)      # 6 × 6
+chol_ZtWZ <- chol(ZtWZ)                   # upper Cholesky: t(U) %*% U = ZtWZ
+rm(null_df, null_fit, Z_mat)
+message("  Null model fitted.")
+
 ## ---- Process loci ----
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1L) stop("Usage: Rscript diabepi_gwas_loci.R <input.json>")
@@ -110,22 +129,22 @@ locus_results <- lapply(job$loci, function(locus) {
         keep <- !is.na(geno)
         if (sum(keep) < 100L) return(NULL)   # too many missing
 
-        df <- data.frame(pheno = pheno_vec[keep],
-                         geno  = geno[keep],
-                         cov_df[keep, ])
-        fit <- tryCatch(
-            glm(pheno ~ ., data = df, family = binomial),
-            error   = function(e) NULL,
-            warning = function(w) suppressWarnings(
-                glm(pheno ~ ., data = df, family = binomial)))
-        if (is.null(fit)) return(NULL)
+        x <- as.double(geno[keep])
+        U <- sum(x * r_null[keep])
 
-        z <- tryCatch(
-            coef(summary(fit))["geno", "z value"],
-            error = function(e) NA_real_)
-        if (is.na(z)) return(NULL)
+        ## Partial information: V_raw - projection onto null-model covariate space.
+        ## Corrects for x's correlation with the intercept (allele frequency mean)
+        ## and with sex, age, PCs.
+        V_raw  <- sum(x * x * w_null[keep])
+        ZtWx   <- crossprod(WZ_mat[keep, , drop = FALSE], x)  # 6-vector
+        c_vec  <- forwardsolve(t(chol_ZtWZ), ZtWx)
+        V      <- V_raw - sum(c_vec * c_vec)
+        if (V <= 0) return(NULL)
 
-        list(rsid = rsid, z_gamma = z)
+        list(rsid     = rsid,
+             z_gamma  = U / sqrt(V),
+             gamma    = U / V,
+             se_gamma = 1 / sqrt(V))
     })
     snp_out <- Filter(Negate(is.null), snp_out)
     result  <- list(locus_id = lid, chr = locus$chr, snps = snp_out)
