@@ -333,13 +333,20 @@ Analysis 3 & sumstats & sumstats \\
 ## Analysis 1 (Zhou et al.): $\hat\gamma$ vs $\hat\alpha$
 
 ```{r slide-indiv, fig.width=4.8, fig.height=3.2}
+## Label only the 6 largest deviants from the IVW line plus the cis-pQTL
+resid_iv  <- abs(indiv_dt$gamma_hat - ivw_indiv_trans$Estimate * indiv_dt$alpha_hat)
+top6_idx  <- order(resid_iv, decreasing = TRUE)[seq_len(min(6L, nrow(indiv_dt)))]
+qtl_lab   <- rep("", nrow(indiv_dt))
+qtl_lab[top6_idx] <- indiv_dt$gene[top6_idx]
+qtl_lab[indiv_dt$scoreid %in% cis_indiv] <- indiv_dt$gene[indiv_dt$scoreid %in% cis_indiv]
+
 plot_iv_estimates(
     alpha_hat    = indiv_dt$alpha_hat,
     se.alpha_hat = indiv_dt$se.alpha_hat,
     gamma_hat    = indiv_dt$gamma_hat,
     se.gamma_hat = indiv_dt$se.gamma_hat,
     theta        = ivw_indiv_trans$Estimate,
-    qtlname      = indiv_dt$gene,
+    qtlname      = qtl_lab,
     highlight    = indiv_dt$scoreid %in% cis_indiv
 ) + labs(
     title = paste0("Analysis 1 — 1000G LD  |  ",
@@ -406,14 +413,12 @@ dt_ukb   <- coeffs_ukb[, .(chr, lo=locus_start, hi=locus_end,
 setkeyv(dt_ukb,   c("chr","lo","hi"))
 setkeyv(dt_indiv, c("chr","lo","hi"))
 alpha_comp <- foverlaps(dt_indiv, dt_ukb, nomatch=0L)
-slope_ols  <- coef(lm(alpha_ukb ~ 0 + alpha_indiv, data=alpha_comp))["alpha_indiv"]
 alpha_comp[, resid_id := alpha_ukb - alpha_indiv]
 alpha_comp[, lab := ifelse(abs(resid_id) > 2*sd(resid_id, na.rm=TRUE), gene, "")]
 ax_breaks <- pretty(c(0, max(alpha_comp$alpha_indiv, alpha_comp$alpha_ukb, na.rm=TRUE)))
 
 ggplot(alpha_comp, aes(x=alpha_indiv, y=alpha_ukb)) +
-    geom_abline(slope=1,         intercept=0, linetype="dashed", colour="grey50") +
-    geom_abline(slope=slope_ols, intercept=0, linetype="dotted", colour="blue") +
+    geom_abline(slope=1, intercept=0, linetype="dashed", colour="grey50") +
     geom_point(size=1.5) +
     geom_text_repel(aes(label=lab), size=2.5, max.overlaps=Inf) +
     scale_x_continuous(breaks=ax_breaks, limits=range(ax_breaks)) +
@@ -425,7 +430,7 @@ ggplot(alpha_comp, aes(x=alpha_indiv, y=alpha_ukb)) +
 ```
 
 \vspace{-0.3em}
-\footnotesize Grey dashed: identity. Blue dotted: OLS through origin.
+\footnotesize Grey dashed: identity ($y = x$).
 Most loci agree well; a few (PDCD1 cis, ASGR1) change with MAF filter applied.
 
 ## Does the LD-approximate $\hat\gamma$ agree with the direct estimate?
