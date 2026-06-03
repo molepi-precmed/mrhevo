@@ -31,7 +31,7 @@ diabepi_host      <- "pmckeigue@diabepi.igmm.ed.ac.uk"
 gap_mb            <- 1.0;  window_mb      <- 1.0
 min_eig_frac      <- 0.01; p_hit          <- 1e-6
 p_cand            <- 1e-5; exclude_hla    <- TRUE
-info_threshold    <- 0.3;  min_maf_threshold <- 0.01
+info_threshold    <- 0.3;  min_maf_threshold <- 0.02
 N_cases           <- 4922L; N_ctrls <- 7452L
 N_gamma           <- N_cases + N_ctrls
 p_case            <- N_cases / N_gamma

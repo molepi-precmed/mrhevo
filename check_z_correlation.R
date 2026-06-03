@@ -18,7 +18,7 @@ diabepi_host   <- "pmckeigue@diabepi.igmm.ed.ac.uk"
 gap_mb            <- 1.0; window_mb <- 1.0
 min_eig_frac      <- 0.01; p_hit <- 1e-6; p_cand <- 1e-5
 exclude_hla       <- TRUE; info_threshold <- 0.3
-min_maf_threshold <- 0.01
+min_maf_threshold <- 0.02
 
 ## ---- Step 1: Load and filter PDCD1 summary stats ----
 message("Loading PDCD1 summary stats...")

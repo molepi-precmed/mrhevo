@@ -30,7 +30,7 @@ p_hit             <- 1e-6
 p_cand            <- 1e-5
 exclude_hla       <- TRUE
 info_threshold    <- 0.3
-min_maf_threshold <- 0.01
+min_maf_threshold <- 0.02
 
 ## ---- Profiling helpers ----
 .t_script <- proc.time()["elapsed"]

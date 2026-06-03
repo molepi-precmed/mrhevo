@@ -33,7 +33,7 @@ p_hit             <- 1e-6
 p_cand            <- 1e-5
 exclude_hla       <- TRUE
 info_threshold    <- 0.3
-min_maf_threshold <- 0.01
+min_maf_threshold <- 0.02
 
 ## Sample size from GS T1D case-control study (SDRNT1BIO cases + GS controls)
 N_cases  <- 4922L
