@@ -20,7 +20,10 @@ source("ld_functions.R")   # for define_loci_expanded only
 ## ---- Parameters ----
 tar_file        <- "pdcd1_stats/PDCD1_Q15116_OID21396_v1_Oncology.tar"
 bim_dir         <- "refpop/bim_by_chr"
-zarr_dir        <- "/opt/datastore/genome/LD_Eur_18mvariants/int8"
+## ---- LD reference panel paths (on genoscores) ----
+zarr_dir_ukb <- "/opt/datastore/genome/LD_Eur_18mvariants/int8"
+zarr_dir_1kg <- "/opt/datastore/genome/1000G/1kg_ld_eur/ld_1kg_eur"
+zarr_dir     <- zarr_dir_ukb   # UKBB EUR zarr (362k samples)
 genoscores_host <- "pmckeigue@genoscores.cphs.mvm.ed.ac.uk"
 diabepi_host    <- "pmckeigue@diabepi.igmm.ed.ac.uk"
 gap_mb            <- 1.0
