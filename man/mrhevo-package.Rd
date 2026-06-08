@@ -13,6 +13,7 @@ Inference of causal effects by Mendelian randomization, marginalizing over distr
 Useful links:
 \itemize{
   \item \url{https://github.com/molepi-precmed/mrhevo}
+  \item Report bugs at \url{https://github.com/molepi-precmed/mrhevo/issues}
 }
 
 }

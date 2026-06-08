@@ -52,7 +52,7 @@ pnorm.extreme <- function(z, upper=TRUE) {
 #' @param x Character vector of numbers in scientific notation.
 #'
 #' @return A character vector of LaTeX math expressions.
-format.scinot.pvalue <- function(x) {
+format_scinot_pvalue <- function(x) {
     x <- toupper(x)
     ## split x.split at E
     x.split <- as.numeric(unlist(strsplit(as.character(x), "E")))
@@ -78,7 +78,7 @@ format.scinot.pvalue <- function(x) {
 #'                          p-values.
 #'
 #' @return Vector of formatted p-values.
-format.z.aspvalue <- function(z, sigfig=1, neglogp.threshold.scinot=3,
+format_z_aspvalue <- function(z, sigfig=1, neglogp.threshold.scinot=3,
                               neglogp.threshold=NULL) {
     p <- signif(2 * pnorm(-abs(z)), sigfig)
     p.char <- toupper(as.character(p))
@@ -96,7 +96,7 @@ format.z.aspvalue <- function(z, sigfig=1, neglogp.threshold.scinot=3,
             paste0("<", format(10^-neglogp.threshold, scientific=FALSE))
     }
     ## format values in scientific notation for LaTeX
-    p.char[grep("E", p.char)] <- format.scinot.pvalue(p.char[grep("E", p.char)])
+    p.char[grep("E", p.char)] <- format_scinot_pvalue(p.char[grep("E", p.char)])
     return(p.char)
 }
 
@@ -178,7 +178,7 @@ get_estimatorsMR <- function(coeffs.dt) {
                                 SE=se.theta_IVW)
     estimators.dt[, z := Estimate / SE]
     estimators.dt[, pvalue := 2 * pnorm(-abs(z))]
-    estimators.dt[, pvalue.formatted := format.z.aspvalue(z)]
+    estimators.dt[, pvalue.formatted := format_z_aspvalue(z)]
     return(estimators.dt)
 }
 
@@ -226,7 +226,7 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
     stderr <- sqrt(0.5 / a)
     z <- mle / stderr
     pvalue <- 2 * pnorm(-abs(z))
-    pvalue.formatted <- format.z.aspvalue(z)
+    pvalue.formatted <- format_z_aspvalue(z)
 
     if (return.asplot) {
         loglik.dt <- data.table(logl.fit=logl, x=xvals,

@@ -113,8 +113,8 @@ install_mrhevo_python <- function(envpath="~/.virtualenvs/mrhevo", ask=TRUE) {
             paste(readLines("/proc/cpuinfo", warn=FALSE), collapse=" ")
         } else {
             ## macOS fallback
-            system("sysctl -n machdep.cpu.features machdep.cpu.leaf7_features 2>/dev/null",
-                   intern=TRUE, ignore.stderr=TRUE) |> paste(collapse=" ")
+            paste(system("sysctl -n machdep.cpu.features machdep.cpu.leaf7_features 2>/dev/null",
+                         intern=TRUE, ignore.stderr=TRUE), collapse=" ")
         }
     }, error=function(e) "")
     grepl("avx2", tolower(cpu_flags))
