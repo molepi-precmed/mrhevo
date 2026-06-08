@@ -49,11 +49,11 @@ mle.theta[, Estimator := "Marginalise over direct effects"]
 print(mle.theta)
 
 ## save plots to temp directory
-ggsave(file.path(example.dir, "posterior_loglik.png"),
+ggplot2::ggsave(file.path(example.dir, "posterior_loglik.png"),
        mle.se.pval(x = theta.samples, prior = prior.theta, return.asplot = TRUE))
-ggsave(file.path(example.dir, "pairsplot.png"),
+ggplot2::ggsave(file.path(example.dir, "pairsplot.png"),
        plot_posterior_pairs(hevo.fit, pars = c("log_tau", "log_eta", "f")))
-ggsave(file.path(example.dir, "kappa_hist.png"),
+ggplot2::ggsave(file.path(example.dir, "kappa_hist.png"),
        plot_kappa_hist(hevo.fit))
 
 ## --- Optional: Stan backend (requires install_mrhevo_stan()) ----------------
