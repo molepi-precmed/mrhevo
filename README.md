@@ -20,10 +20,6 @@ With the example dataset used here, results with MR-HORSE are very similar to re
 
 The motivation for this work was to develop a method to test formally for causality in [genome-wide aggregated _trans_- effects analysis](https://doi.org/10.1016/j.ajhg.2023.04.003), which aims to detect core genes for a disease or trait by testing for association with predicted _trans_- effects of SNPs on gene expression, aggregated over multiple QTLs.  With this approach, the genetic instruments are scalar variables calculated from clumps of SNPs that have _trans_- effects on the expression of a gene as transcript or circulating protein.  
 
-## Guide
-
-- A description of the statistical model is available on the [theory page](https://github.com/molepi-precmed/mrhevo/blob/main/theorymethods.pdf)
-
 ## Installation
 
 To install the current version of the package from GitHub use:
