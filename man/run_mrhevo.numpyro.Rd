@@ -95,7 +95,7 @@ p.coeffs <- plot_iv_estimates(
     se.alpha_hat = coeffs.dt$se.alpha_hat,
     gamma_hat    = coeffs.dt$gamma_hat,
     se.gamma_hat = coeffs.dt$se.gamma_hat,
-    theta        = estimators[Estimator == "IVW", Estimate],
+    theta        = estimators[Estimator == "Inverse variance weighted", Estimate],
     qtlname      = coeffs.dt$qtlname)
 
 \donttest{
