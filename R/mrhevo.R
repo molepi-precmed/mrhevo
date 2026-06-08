@@ -43,8 +43,8 @@ utils::globalVariables(c(
     packageStartupMessage("MRHEVO ", packageVersion("mrhevo"), ":")
     packageStartupMessage("    Currently using ", foreach::getDoParWorkers(),
                           " cores, set 'options(cores=<n.cores>)' to change.")
-    packageStartupMessage("    NumPyro (default backend): call install_mrhevo_python() to set up.")
-    packageStartupMessage("    Stan (optional backend): call install_mrhevo_stan() to set up.")
+    packageStartupMessage("    NumPyro backend: call install_mrhevo_python() to set up.")
+    packageStartupMessage("    Stan backend: call install_mrhevo_stan() to set up.")
 }
 
 .onLoad <- function(libname, pkgname) {
@@ -64,9 +64,11 @@ utils::globalVariables(c(
 
 #' Install Python dependencies for the NumPyro backend.
 #'
-#' Creates a virtual environment and installs \code{jax}, \code{numpyro},
-#' and \code{arviz}.  This is called automatically on first package load;
-#' call it manually if the environment needs to be rebuilt.
+#' Creates a Python virtual environment and installs \code{jax},
+#' \code{numpyro}, and \code{arviz}.  Before installing, checks whether the
+#' CPU supports AVX2 instructions required by JAX.  If the CPU is
+#' incompatible, warns the user and offers to install the Stan backend instead
+#' via \code{\link{install_mrhevo_stan}}.
 #'
 #' @param envpath Path for the virtual environment
 #'        (default: \code{~/.virtualenvs/mrhevo}).
@@ -79,6 +81,23 @@ utils::globalVariables(c(
 #' @export
 install_mrhevo_python <- function(envpath="~/.virtualenvs/mrhevo", ask=TRUE) {
     envpath <- path.expand(envpath)
+
+    ## Check CPU compatibility: JAX requires AVX2 (x86_64 CPUs since ~2013).
+    jax_ok <- .check_jax_cpu_compat()
+    if (!jax_ok) {
+        warning("This CPU does not support AVX2 instructions required by JAX/NumPyro.\n",
+                "The NumPyro backend will not work on this machine.")
+        if (interactive()) {
+            answer <- readline("Install the Stan backend instead? [y/N] ")
+            if (tolower(trimws(answer)) %in% c("y", "yes")) {
+                install_mrhevo_stan()
+                return(invisible(envpath))
+            }
+        }
+        message("Run install_mrhevo_stan() to use the Stan backend instead.")
+        return(invisible(envpath))
+    }
+
     if (ask && interactive()) {
         answer <- readline(
             paste0("Install NumPyro Python environment at ", envpath, "? [y/N] "))
@@ -98,11 +117,26 @@ install_mrhevo_python <- function(envpath="~/.virtualenvs/mrhevo", ask=TRUE) {
     invisible(envpath)
 }
 
+## Internal helper: returns TRUE if CPU supports AVX2 (required by JAX).
+.check_jax_cpu_compat <- function() {
+    cpu_flags <- tryCatch({
+        if (file.exists("/proc/cpuinfo")) {
+            paste(readLines("/proc/cpuinfo", warn=FALSE), collapse=" ")
+        } else {
+            ## macOS fallback
+            system("sysctl -n machdep.cpu.features machdep.cpu.leaf7_features 2>/dev/null",
+                   intern=TRUE, ignore.stderr=TRUE) |> paste(collapse=" ")
+        }
+    }, error=function(e) "")
+    grepl("avx2", tolower(cpu_flags))
+}
+
 #' Install the Stan backend for mrhevo.
 #'
 #' Installs the \pkg{rstan} and \pkg{bayesplot} R packages, which are only
-#' required when using the Stan sampler (\code{\link{run_mrhevo.sstats}} with
-#' \code{model.dir} pointing to the bundled Stan models).
+#' required when using the Stan sampler (\code{\link{run_mrhevo_stan}}).
+#' Use this function if the NumPyro backend is unavailable (e.g., because
+#' the CPU does not support AVX2); see \code{\link{install_mrhevo_python}}.
 #'
 #' @param repos CRAN mirror to use (defaults to the current option).
 #'

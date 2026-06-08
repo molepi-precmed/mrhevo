@@ -17,7 +17,9 @@ prompt before creating the environment.}
 Invisibly returns the environment path.
 }
 \description{
-Creates a virtual environment and installs \code{jax}, \code{numpyro},
-and \code{arviz}.  This is called automatically on first package load;
-call it manually if the environment needs to be rebuilt.
+Creates a Python virtual environment and installs \code{jax},
+\code{numpyro}, and \code{arviz}.  Before installing, checks whether the
+CPU supports AVX2 instructions required by JAX.  If the CPU is
+incompatible, warns the user and offers to install the Stan backend instead
+via \code{\link{install_mrhevo_stan}}.
 }

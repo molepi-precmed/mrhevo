@@ -14,6 +14,7 @@ Invisibly returns \code{NULL}.
 }
 \description{
 Installs the \pkg{rstan} and \pkg{bayesplot} R packages, which are only
-required when using the Stan sampler (\code{\link{run_mrhevo.sstats}} with
-\code{model.dir} pointing to the bundled Stan models).
+required when using the Stan sampler (\code{\link{run_mrhevo_stan}}).
+Use this function if the NumPyro backend is unavailable (e.g., because
+the CPU does not support AVX2); see \code{\link{install_mrhevo_python}}.
 }

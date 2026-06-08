@@ -97,7 +97,7 @@ ggsave(file.path(example.dir, "coeffsplot.png"), p.coeffs)
 ## --- Optional: Stan backend (requires install_mrhevo_stan()) ----------------
 ## model.dir <- system.file("stan", package="mrhevo")
 ## options(warn=1)
-## hevo.stanfit <- run_mrhevo.sstats(
+## hevo.stanfit <- run_mrhevo_stan(
 ##     alpha_hat=coeffs.dt$alpha_hat,
 ##     se.alpha_hat=coeffs.dt$se.alpha_hat,
 ##     gamma_hat=coeffs.dt$gamma_hat,

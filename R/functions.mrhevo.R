@@ -269,147 +269,6 @@ mle.se.pval <- function(x, prior, return.asplot=FALSE) {
 }
 
 #' Run Stan model for Mendelian randomization with regularized horsehoe prior
-#' on pleiotropic effects.
-#'
-#' @param use.sampling Logical. If set to \code{TRUE} (default), uses sampling
-#'                     rather than variational approximation.
-#' @param logistic Logical. If set to \code{TRUE} (default), uses logistic
-#'                 rather than linear regression.
-#' @param Z Data.table of genetic instruments.
-#' @param Y Vector of outcomes.
-#' @param sigma_y Standard deviation of outcome variable. Used only if
-#'        \code{logistic=FALSE}.
-#' @param X_u Data.table of unpenalized covariates.
-#' @param alpha_hat Vector of estimated coefficients for effect of instruments
-#'        on exposure.
-#' @param se.alpha_hat Vector of standard errors for coefficients alpha_hat.
-#' @param fraction_pleio Prior guess at fraction of instruments that have
-#'        pleiotropic effects: values between 0.05 and 0.95 are allowed.
-#' @param slab_scale Scale parameter for slab component of regularized horseshoe
-#'        prior (default 0.25).
-#' @param priorsd_theta Standard deviation of prior on theta.
-#' @param vb.algo Variational Bayes algorithm, one of \code{"meanfield"} or
-#'        \code{"fullrank"} (default \code{"meanfield"}).
-#' @param model.dir Full path to STAN model directory
-#'        (default: bundled Stan models).
-#'
-#' @returns An object of class stanfit.
-#'
-#' @example man/examples/runmrhevo.R
-#' @export
-#' @import data.table ggplot2
-run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
-                       Z, Y, sigma_y=1, X_u, alpha_hat, se.alpha_hat,
-                       fraction_pleio=NULL, slab_scale=0.25, priorsd_theta=1,
-                       vb.algo="meanfield",
-                       model.dir=system.file("stan", package="mrhevo")) {
-    if (!requireNamespace("rstan", quietly=TRUE)) {
-        stop("The Stan backend requires the 'rstan' package. ",
-             "Run install_mrhevo_stan() to install it.")
-    }
-    rstan::rstan_options(auto_write=TRUE)
-
-    msg(bold, "Compiling stan model ... ")
-    mr.stanmodel <- rstan::stan_model(
-        file=file.path(model.dir, "MRHevo_logistic.stan"),
-        model_name="MRHevo.logistic", verbose=FALSE)
-    msg(note, "Done.\n")
-
-    ## check arguments for consistency
-    stopifnot(length(unique(c(nrow(Z), nrow(X_u), length(Y)))) == 1)
-    stopifnot(length(unique(c(ncol(Z), length(alpha_hat), length(se.alpha_hat)))) == 1)
-    stopifnot(fraction_pleio >= 0.05 & fraction_pleio <= 0.95)
-
-    N <- nrow(Z)
-    J <- ncol(Z)
-    X_u <- scale(X_u, center=TRUE, scale=TRUE)
-    Z <- scale(Z, center=TRUE, scale=FALSE)
-
-    ## priors
-    ## weak prior on Y intercept
-    scale_intercept_y <- 10
-
-    ## prior sd of coeffs for unpenalized covariates X_u
-    scale_beta_u <- 1
-
-    ## prior scale of c is slab_scale
-
-    ## 1 for half-Cauchy, large value specifies a gaussian prior on slab
-    ## component
-    slab_df <- 2
-
-    ## 1 for half-Cauchy prior on global scale param: specifying a larger value
-    ## will limit the narrowness of the spike component
-    nu_global <- 1
-
-    ## 1 for half-Cauchy, horseshoe+ or horseshoe if c is large
-    nu_local <- 1
-
-    ## prior guess of number of instruments that are pleiotropic
-    if (is.null(fraction_pleio)) {
-        fraction_pleio <- 0.5
-    }
-    r_pleio <- fraction_pleio * J
-
-    ## Piironen and Vehtari recommend that the prior on tau should be chosen to
-    ## have most of the prior mass
-    ## near (r_pleio / (N * (J - r_pleio)) * sqrt(pseudovariance) / sqrt(N),
-    ## where r_pleio is a prior guess for the number of nonzero coefficients
-
-    ## prior median of a half-t distribution with nu_global df
-    ## 0.82 with nu_global=1
-    priormedian <- qt(p=0.75, df=nu_global, lower.tail=TRUE)
-
-    if (logistic) {
-        mu <- mean(Y)
-        pseudovariance <- (mu * (1 - mu))^-1
-        tau_0 <- (r_pleio / (J - r_pleio)) * sqrt(pseudovariance) / sqrt(N)
-    } else {
-        tau_0 <- (r_pleio / (J - r_pleio)) * sigma_y / sqrt(N)
-    }
-
-    ## choose prior on tau so that most of the prior mass is near tau_0
-    ## choose scale_global so that the prior median of the half-t distribution
-    ## equates to tau_0
-    scale_global <- tau_0 / priormedian
-
-    ## sample the posterior
-    data.stan <- list(logistic=as.integer(logistic),
-                    Z=as.matrix(Z), Y=Y, X_u=as.matrix(X_u),
-                    N=N, J=J, U=ncol(X_u),
-                    alpha_hat=alpha_hat,
-                    sd_alpha_hat=se.alpha_hat,
-                    nu_global=nu_global,
-                    nu_local=nu_local,
-                    scale_global=scale_global,
-                    scale_intercept_y=scale_intercept_y,
-                    scale_beta_u=scale_beta_u,
-                    priorsd_theta=priorsd_theta,
-                    slab_scale=slab_scale,
-                    slab_df=slab_df)
-
-    if (use.sampling) {
-        fit.mc <- rstan::sampling(object=mr.stanmodel,
-                                  data=data.stan,
-                                  iter=1200, warmup=400,
-                                  cores=4,
-                                  chains=4,
-                                  refresh=200,
-                                  control=list(adapt_delta=0.95),
-                                  verbose=FALSE)
-    } else {
-        fit.mc <- rstan::vb(object=mr.stanmodel,
-                            data=data.stan,
-                            algorithm=vb.algo,
-                            refresh=5000,
-                            iter=20000,
-                            adapt_engaged=TRUE,
-                            tol_rel_obj=0.01)
-    }
-    return(fit.mc)
-}
-
-#' Run Stan model for Mendelian randomization with regularized horsehoe prior
 #' on pleiotropic effects, using summary statistics only.
 #'
 #' @param alpha_hat Vector of estimated coefficients for effect of instruments
@@ -432,7 +291,7 @@ run_mrhevo <- function(use.sampling=TRUE, logistic=TRUE,
 #'
 #' @return An object of class stanfit.
 #' @export
-run_mrhevo.sstats <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
+run_mrhevo_stan <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                               fraction_pleio=NULL, slab_scale=0.2, slab_df=2,
                               priorsd_theta=1,
                               model.dir=system.file("stan", package="mrhevo"),
@@ -758,6 +617,7 @@ plot_kappa_hist <- function(fit, bin_width = 0.02) {
 #'
 #' @return A list with posterior samples in rstan-like format.
 #'
+#' @example man/examples/runmrhevo.R
 #' @import reticulate
 #' @export
 run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
