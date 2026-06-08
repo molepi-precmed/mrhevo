@@ -1,26 +1,71 @@
-## directories and files
-man-roxygen
-tests
+## Standard build/check artefacts
+\.Rcheck$
+\.Rhistory
+\.git
+\.gitignore
+\.lintr
+^LICENSE$
 
-## patterns
-^prof
-^score
-.txt$
-.gz$
-.sh$
-.Rcheck$
-.Rdata$
-.Rhistory
-.git
-\.stan$
-.RDS
-.gitignore
-.lintr
+## Package documentation meta-files
+^AGENTS\.md$
+^CLAUDE\.md$
+
+## Large local LD reference data (not part of the package)
 ^ld_ukbb
 ^ld_ukbb_18m
-.Rmd
-.md
-.pdf
-.html
-^LICENSE$
-^AGENTS\.md$
+^refpop
+
+## Analysis data and outputs (not part of the package)
+^pdcd1_stats
+^t1d_stats
+^pdcd1_t1d_mrhevo
+^alpha_
+^gamma_
+^gate_
+^locus_genes
+^z_scores
+^snp_job\.json
+
+## Analysis and pipeline scripts (not part of the package)
+^compute_
+^check_
+^run_mrhevo_pdcd1_t1d\.R
+^runmrhevo\.R
+^mrsim\.R
+^diabepi_gwas_loci\.R
+^diabepi_1kg_ld\.py
+^extract_ld_blocks_hg38\.py
+^get_ld_matrix\.py
+^genoscores_zarr_loci\.py
+^split_bim_by_chr\.R
+^ld_functions\.R
+
+## Rendered reports and logs
+^summarystats_mr_gate
+^mrhevo_derivations
+^theorymethods
+^gate_derivation
+^ld_adjustment_derivation
+^nonlinear_mr
+^pdcd1_t1d_mrhevo\.Rmd
+^pdcd1_t1d_mrhevo\.pdf
+^MRHevo_paper\.Rmd
+^mrhevo_pyro\.R
+^mrhevo_pyro\.py
+\.log$
+\.pdf$
+\.html$
+
+## Miscellaneous session and cache files
+^claude_memory
+^\.claude
+^__pycache__
+^refGene\.txt\.gz
+\.png$
+\.csv$
+^claude_conversation\.jsonl
+^mrhevo_scaling_bug\.md
+^t1d_datafiles\.md
+^mr\.bib
+^MRHevo_summarystats\.rds
+^MRHevo_summarystats\.stan
