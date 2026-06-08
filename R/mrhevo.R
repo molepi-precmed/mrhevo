@@ -35,10 +35,13 @@ utils::globalVariables(c(
 #' @importFrom utils packageVersion
 #' @importFrom stats pnorm qt lm density glm as.formula cor
 .onAttach <- function(libname, pkgname) {
-    ## put a cap on the number of cores used by default
+    ## Do not spawn parallel workers during R CMD check (CRAN limits simultaneous processes).
+    check_env <- identical(Sys.getenv("_R_CHECK_LIMIT_CORES_"), "TRUE")
     if (is.null(getOption("cores")))
-        options(cores=min(floor(parallel::detectCores() / 2), 10))
-    doParallel::registerDoParallel()
+        options(cores = if (check_env) 1L
+                        else min(floor(parallel::detectCores() / 2), 10))
+    if (!check_env)
+        doParallel::registerDoParallel()
 
     packageStartupMessage("MRHEVO ", packageVersion("mrhevo"), ":")
     packageStartupMessage("    Currently using ", foreach::getDoParWorkers(),
@@ -47,20 +50,6 @@ utils::globalVariables(c(
     packageStartupMessage("    Stan backend: call install_mrhevo_stan() to set up.")
 }
 
-.onLoad <- function(libname, pkgname) {
-    ## Install NumPyro Python environment on first load if not already present
-    env_path <- path.expand("~/.virtualenvs/mrhevo")
-    if (!reticulate::virtualenv_exists(env_path)) {
-        tryCatch(
-            install_mrhevo_python(envpath=env_path, ask=FALSE),
-            error=function(e) {
-                warning("Could not auto-install NumPyro environment: ",
-                        conditionMessage(e),
-                        "\nRun install_mrhevo_python() manually to set up.")
-            }
-        )
-    }
-}
 
 #' Install Python dependencies for the NumPyro backend.
 #'
