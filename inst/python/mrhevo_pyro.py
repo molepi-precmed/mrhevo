@@ -86,23 +86,29 @@ def mrhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df
     return mrhevo
 
 
-def mrhorse(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_df, scale_global, priorsd_theta, hierarchical_alpha=1):
-    """Unregularized horseshoe (no slab)"""
+def mrhorse(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, scale_global, priorsd_theta, hierarchical_alpha=1):
+    """Unregularized horseshoe prior for MR (equivalent to MR-HORSE).
+
+    The local shrinkage parameters lambda are used directly without a slab
+    component, so there is no upper bound on direct effect sizes.  This is
+    equivalent to the prior used in the published MR-HORSE package.
+    Invoke via run_mrhevo.numpyro(..., regularize=FALSE).
+    """
     rng_key = random.PRNGKey(42)
     rng_key, rng_key_ = random.split(rng_key)
     nu_local = 1
     nu_global = 1
     J = alpha_hat.shape[0]
-    
+
     aux1_global = npyr.sample("aux1_global", dist.HalfNormal(1.0), rng_key=rng_key)
-    aux2_global = npyr.sample("aux2_global", dist.InverseGamma(0.5 * nu_global, 0.5 * nu_global), rng_key=rng_key) 
-    τ = npyr.deterministic("tau", aux1_global * jnp.sqrt(aux2_global) * scale_global) 
+    aux2_global = npyr.sample("aux2_global", dist.InverseGamma(0.5 * nu_global, 0.5 * nu_global), rng_key=rng_key)
+    τ = npyr.deterministic("tau", aux1_global * jnp.sqrt(aux2_global) * scale_global)
     θ = npyr.sample("theta", dist.Normal(0, priorsd_theta), rng_key=rng_key)
-    
+
     if hierarchical_alpha == 1:
         mu_alpha = npyr.sample("mu_alpha", dist.Normal(0, 1.0), rng_key=rng_key)
         sigma_alpha = npyr.sample("sigma_alpha", dist.HalfNormal(1.0), rng_key=rng_key)
-    
+
     with npyr.plate("J instruments", J):
         if hierarchical_alpha == 1:
             alpha = npyr.sample("alpha", dist.Normal(mu_alpha, sigma_alpha), rng_key=rng_key)
@@ -110,15 +116,15 @@ def mrhorse(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_d
             alpha = npyr.sample("alpha", dist.Normal(0, 1.0), rng_key=rng_key)
         z = npyr.sample("z", dist.Normal(0, 1.0), rng_key=rng_key)
         aux1_local = npyr.sample("aux1_local", dist.HalfNormal(1.0), rng_key=rng_key)
-        aux2_local = npyr.sample("aux2_local", dist.InverseGamma(0.5 * nu_local, 0.5 * nu_local), rng_key=rng_key) 
-        lambda_ = npyr.deterministic("lambda_", jnp.multiply(aux1_local, jnp.sqrt(aux2_local))) 
+        aux2_local = npyr.sample("aux2_local", dist.InverseGamma(0.5 * nu_local, 0.5 * nu_local), rng_key=rng_key)
+        lambda_ = npyr.deterministic("lambda_", jnp.multiply(aux1_local, jnp.sqrt(aux2_local)))
         lambda_tilde = npyr.deterministic("lambda_tilde", lambda_)
         beta = npyr.deterministic("beta", jnp.multiply(z, lambda_tilde * τ))
         gamma = npyr.deterministic("gamma", beta + θ * alpha)
-        kappa = npyr.deterministic("kappa", jnp.divide(1.0 , 1.0 + jnp.square(lambda_tilde)))
-        alpha_hat = npyr.sample("alpha_hat", dist.Normal(alpha, se_alpha_hat), obs=alpha_hat)
-        gamma_hat = npyr.sample("gamma_hat", dist.Normal(gamma, se_gamma_hat), obs=gamma_hat)
-    f = npyr.deterministic("f", jnp.sum( 1.0 - kappa ) / J) 
+        kappa = npyr.deterministic("kappa", jnp.divide(1.0, 1.0 + jnp.square(lambda_tilde)))
+        alpha_hat_obs = npyr.sample("alpha_hat", dist.Normal(alpha, se_alpha_hat), obs=alpha_hat)
+        gamma_hat_obs = npyr.sample("gamma_hat", dist.Normal(gamma, se_gamma_hat), obs=gamma_hat)
+    f = npyr.deterministic("f", jnp.sum(1.0 - kappa) / J)
     log_τ = npyr.deterministic("log_tau", jnp.log(τ))
     return mrhorse
 
@@ -254,6 +260,7 @@ def nullhevo(alpha_hat, se_alpha_hat, gamma_hat, se_gamma_hat, slab_scale, slab_
 # recompile the model on every invocation.
 _mcmc_cache = {}
 _mcmc_cache_gaussian = {}
+_mcmc_cache_mrhorse = {}
 
 def get_samples_numpy(mcmc, sample_names):
     """Extract named posterior samples as a dict of plain NumPy arrays.
@@ -349,6 +356,43 @@ def get_cached_mcmc_gaussian(target_accept_prob=0.95, num_warmup=500, num_sample
             progress_bar=True,
         )
     return _mcmc_cache_gaussian[key]
+
+
+def get_cached_mcmc_mrhorse(target_accept_prob=0.95, num_warmup=500, num_samples=1000, num_chains=4):
+    """Return a cached MCMC object for the mrhorse (unregularized horseshoe) model.
+
+    Analogous to get_cached_mcmc but uses the unregularized horseshoe model.
+    The first call compiles the model via JAX; subsequent calls with identical
+    hyperparameters skip recompilation.
+
+    Parameters
+    ----------
+    target_accept_prob : float
+        Target acceptance probability for NUTS (default 0.95).
+    num_warmup : int
+        Number of warmup steps (default 500).
+    num_samples : int
+        Number of posterior samples per chain (default 1000).
+    num_chains : int
+        Number of parallel chains (default 4).
+
+    Returns
+    -------
+    MCMC
+        Configured (and possibly already compiled) MCMC object.
+    """
+    key = (target_accept_prob, num_warmup, num_samples, num_chains)
+    if key not in _mcmc_cache_mrhorse:
+        nuts = NUTS(mrhorse, target_accept_prob=target_accept_prob)
+        _mcmc_cache_mrhorse[key] = MCMC(
+            nuts,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            chain_method="parallel",
+            progress_bar=True,
+        )
+    return _mcmc_cache_mrhorse[key]
 
 
 def setup_sampler(model, dense_mass=False, target_accept_prob=0.95, num_warmup=500):

@@ -20,7 +20,8 @@ run_mrhevo.numpyro(
   num_samples = 1000,
   num_chains = 4,
   target_accept_prob = 0.95,
-  prior = "horseshoe"
+  prior = "horseshoe",
+  regularize = TRUE
 )
 }
 \arguments{
@@ -60,6 +61,12 @@ hierarchical model for alpha.}
 
 \item{prior}{Prior distribution type, one of \code{"horseshoe"} (default)
 or \code{"gaussian"}.}
+
+\item{regularize}{Logical. If \code{TRUE} (default), uses the regularized
+horseshoe prior (slab component clips large direct effects).  If
+\code{FALSE}, uses the unregularized horseshoe prior, equivalent to
+the MR-HORSE model; \code{slab_scale} and \code{slab_df} are ignored.
+Only applies when \code{prior = "horseshoe"}.}
 }
 \value{
 A list with posterior samples in rstan-like format.

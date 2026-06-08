@@ -614,6 +614,11 @@ plot_kappa_hist <- function(fit, bin_width = 0.02) {
 #' @param target_accept_prob Target acceptance probability (default 0.95).
 #' @param prior Prior distribution type, one of \code{"horseshoe"} (default)
 #'        or \code{"gaussian"}.
+#' @param regularize Logical. If \code{TRUE} (default), uses the regularized
+#'        horseshoe prior (slab component clips large direct effects).  If
+#'        \code{FALSE}, uses the unregularized horseshoe prior, equivalent to
+#'        the MR-HORSE model; \code{slab_scale} and \code{slab_df} are ignored.
+#'        Only applies when \code{prior = "horseshoe"}.
 #'
 #' @return A list with posterior samples in rstan-like format.
 #'
@@ -627,7 +632,7 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
                                 hierarchical_alpha = TRUE,
                                 num_warmup = 500, num_samples = 1000,
                                 num_chains = 4, target_accept_prob = 0.95,
-                                prior = "horseshoe") {
+                                prior = "horseshoe", regularize = TRUE) {
 
     if (is.null(env_path)) {
         env_path <- "~/.virtualenvs/mrhevo"
@@ -657,11 +662,13 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
         reticulate::source_python(model_path)
         mrhevo.env$get_cached_mcmc          <- get_cached_mcmc
         mrhevo.env$get_cached_mcmc_gaussian <- get_cached_mcmc_gaussian
+        mrhevo.env$get_cached_mcmc_mrhorse  <- get_cached_mcmc_mrhorse
         mrhevo.env$get_samples_numpy        <- get_samples_numpy
         mrhevo.env$python_loaded <- TRUE
     } else {
         get_cached_mcmc          <- mrhevo.env$get_cached_mcmc
         get_cached_mcmc_gaussian <- mrhevo.env$get_cached_mcmc_gaussian
+        get_cached_mcmc_mrhorse  <- mrhevo.env$get_cached_mcmc_mrhorse
         get_samples_numpy        <- mrhevo.env$get_samples_numpy
     }
 
@@ -681,27 +688,45 @@ run_mrhevo.numpyro <- function(alpha_hat, se.alpha_hat, gamma_hat, se.gamma_hat,
         priormedian <- qt(p = 0.75, df = nu_global, lower.tail = TRUE)
         scale_global <- tau0 / priormedian
 
-        ## Reuse a cached MCMC object so JAX skips recompilation on subsequent calls.
-        nuts_kernel <- get_cached_mcmc(
-            target_accept_prob = target_accept_prob,
-            num_warmup = as.integer(num_warmup),
-            num_samples = as.integer(num_samples),
-            num_chains = as.integer(num_chains)
-        )
-
-        nuts_kernel$run(rng_key,
-                        alpha_hat = np$array(alpha_hat),
-                        se_alpha_hat = np$array(se.alpha_hat),
-                        gamma_hat = np$array(gamma_hat),
-                        se_gamma_hat = np$array(se.gamma_hat),
-                        slab_scale = as.double(slab_scale),
-                        slab_df = as.double(slab_df),
-                        scale_global = as.double(scale_global),
-                        priorsd_theta = as.double(priorsd_theta),
-                        hierarchical_alpha = as.integer(hierarchical_alpha))
-
-        sample_names <- c("theta", "tau", "log_tau", "eta", "log_eta", "f", "b",
-                          "alpha", "beta", "kappa", "lambda_tilde")
+        if (regularize) {
+            ## Regularized horseshoe (slab component clips large direct effects).
+            nuts_kernel <- get_cached_mcmc(
+                target_accept_prob = target_accept_prob,
+                num_warmup = as.integer(num_warmup),
+                num_samples = as.integer(num_samples),
+                num_chains = as.integer(num_chains)
+            )
+            nuts_kernel$run(rng_key,
+                            alpha_hat = np$array(alpha_hat),
+                            se_alpha_hat = np$array(se.alpha_hat),
+                            gamma_hat = np$array(gamma_hat),
+                            se_gamma_hat = np$array(se.gamma_hat),
+                            slab_scale = as.double(slab_scale),
+                            slab_df = as.double(slab_df),
+                            scale_global = as.double(scale_global),
+                            priorsd_theta = as.double(priorsd_theta),
+                            hierarchical_alpha = as.integer(hierarchical_alpha))
+            sample_names <- c("theta", "tau", "log_tau", "eta", "log_eta", "f", "b",
+                              "alpha", "beta", "kappa", "lambda_tilde")
+        } else {
+            ## Unregularized horseshoe (equivalent to MR-HORSE); no slab.
+            nuts_kernel <- get_cached_mcmc_mrhorse(
+                target_accept_prob = target_accept_prob,
+                num_warmup = as.integer(num_warmup),
+                num_samples = as.integer(num_samples),
+                num_chains = as.integer(num_chains)
+            )
+            nuts_kernel$run(rng_key,
+                            alpha_hat = np$array(alpha_hat),
+                            se_alpha_hat = np$array(se.alpha_hat),
+                            gamma_hat = np$array(gamma_hat),
+                            se_gamma_hat = np$array(se.gamma_hat),
+                            scale_global = as.double(scale_global),
+                            priorsd_theta = as.double(priorsd_theta),
+                            hierarchical_alpha = as.integer(hierarchical_alpha))
+            sample_names <- c("theta", "tau", "log_tau", "f",
+                              "alpha", "beta", "kappa", "lambda_tilde")
+        }
 
     } else {  ## gaussian
 
