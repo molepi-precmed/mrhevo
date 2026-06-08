@@ -10,7 +10,8 @@ plot_iv_estimates(
   gamma_hat,
   se.gamma_hat,
   theta,
-  qtlname = NULL
+  qtlname = NULL,
+  highlight = NULL
 )
 }
 \arguments{
@@ -27,6 +28,9 @@ on outcome.}
 \item{theta}{Maximum likelihood estimate of causal effect (slope).}
 
 \item{qtlname}{Optional vector of QTL names for labeling points.}
+
+\item{highlight}{Optional logical vector; points where TRUE are coloured red
+(e.g. to mark the cis-pQTL). Other points are black.}
 }
 \value{
 A ggplot object showing IV estimates with MLE as line through origin.

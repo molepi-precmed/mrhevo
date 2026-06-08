@@ -26,7 +26,8 @@ utils::globalVariables(c(
     "se.theta_IV", "size.theta_IV", "inv.var",
     "Estimate", "SE", "z", "pvalue", "pvalue.formatted",
     "variable",
-    "rownum", "logl.fit", "logl.quad", "loglik", "curve", "posterior"
+    "rownum", "logl.fit", "logl.quad", "loglik", "curve", "posterior",
+    "pt_color"
 ))
 
 #' @import doParallel

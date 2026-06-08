@@ -16,6 +16,8 @@ tests
 .RDS
 .gitignore
 .lintr
+^ld_ukbb
+^ld_ukbb_18m
 .Rmd
 .md
 .pdf

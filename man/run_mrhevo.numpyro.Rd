@@ -2,7 +2,7 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{run_mrhevo.numpyro}
 \alias{run_mrhevo.numpyro}
-\title{Run Stan model for Mendelian randomization using NumPyro.}
+\title{Run model for Mendelian randomization using NumPyro.}
 \usage{
 run_mrhevo.numpyro(
   alpha_hat,
@@ -65,5 +65,5 @@ or \code{"gaussian"}.}
 A list with posterior samples in rstan-like format.
 }
 \description{
-Run Stan model for Mendelian randomization using NumPyro.
+Run model for Mendelian randomization using NumPyro.
 }

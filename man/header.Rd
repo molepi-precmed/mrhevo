@@ -2,7 +2,7 @@
 % Please edit documentation in R/functions.mrhevo.R
 \name{header}
 \alias{header}
-\title{Output a consisted header message.}
+\title{Output a header message.}
 \usage{
 header(message)
 }
@@ -10,5 +10,5 @@ header(message)
 \item{message}{Message to output.}
 }
 \description{
-Output a consisted header message.
+Output a header message.
 }
