@@ -1,7 +1,3 @@
-**Note:** `npyr.set_host_device_count(4)` is now called before any JAX imports in `mrhevo_pyro.py`. JAX locks in the device count on first import, so the call must precede all `jax` imports to take effect and allow MCMC chains to run in parallel with `chain_method="parallel"`.
-
-
-
 # MR-Hevo -- Inference of causal effects by Mendelian randomization, marginalizing over distribution of pleiotropic effects
 
 Mendelian randomization has been widely used to study causal effects of exposures (broadly defined to include behavioural traits, biomarkers and gene expression levels) on diseases.  The biggest methodological challenge is how to infer causality when some of the genetic instruments have direct (pleiotropic) effects on the outcome that are not mediated through the exposure under study.  These pleiotropic effects are not directly observed, and their distribution over the instruments is unknown.
@@ -130,7 +126,7 @@ install_mrhevo_stan()
 model.dir <- system.file("stan", package = "mrhevo")
 
 # Run MR-Hevo with Stan
-fit_stan <- run_mrhevo.sstats(
+fit_stan <- run_mrhevo_stan(
   alpha_hat = alpha_hat,
   se.alpha_hat = se.alpha_hat,
   gamma_hat = gamma_hat,
@@ -241,4 +237,4 @@ This error is related to system `/tmp` directory being not writable. This is a c
 
 # Copyright
 
-This code was developed by [Paul McKeigue](https://precmed.cphs.mvm.ed.ac.uk/pmckeigue), [Andrii Iakovliev](https://whimsial.github.io), [Buddhiprabha Erabadda](https://www.linkedin.com/in/buddhiprabha/) and [Athina Spiliopoulou](https://precmed.cphs.mvm.ed.ac.uk/athina/) and licensed under [GPL-3 license](https://www.gnu.org/licenses/gpl-3.0.txt).
+This code was developed by [Paul McKeigue](https://precmed.cphs.mvm.ed.ac.uk/pmckeigue/), [Andrii Iakovliev](https://whimsial.github.io), [Buddhiprabha Erabadda](https://www.linkedin.com/in/buddhiprabha/) and [Athina Spiliopoulou](https://precmed.cphs.mvm.ed.ac.uk/athina/) and licensed under GPL-3.
