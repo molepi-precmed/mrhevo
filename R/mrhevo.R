@@ -35,12 +35,12 @@ utils::globalVariables(c(
 #' @importFrom utils packageVersion
 #' @importFrom stats pnorm qt lm density glm as.formula cor
 .onAttach <- function(libname, pkgname) {
-    ## Do not spawn parallel workers during R CMD check (CRAN limits simultaneous processes).
-    check_env <- identical(Sys.getenv("_R_CHECK_LIMIT_CORES_"), "TRUE")
+    ## Only register parallel workers in interactive sessions.
+    ## R CMD INSTALL and R CMD check run non-interactively; spawning workers
+    ## there hits CRAN's process limit and causes installation failure.
     if (is.null(getOption("cores")))
-        options(cores = if (check_env) 1L
-                        else min(floor(parallel::detectCores() / 2), 10))
-    if (!check_env)
+        options(cores = min(floor(parallel::detectCores() / 2), 10))
+    if (interactive())
         doParallel::registerDoParallel()
 
     packageStartupMessage("MRHEVO ", packageVersion("mrhevo"), ":")
